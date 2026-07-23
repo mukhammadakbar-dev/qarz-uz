@@ -1,0 +1,42 @@
+.dd-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+.dd-out { font-size: 20px; font-weight: 650; letter-spacing: -0.02em; }
+.dd-phone { margin-left: auto; }
+.dd-summary .btn-primary { margin-left: auto; }
+.dd-phone + .btn-primary { margin-left: 0; }
+
+.dd-empty { text-align: center; padding: 28px 0; }
+.dd-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+
+.dd-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.dd-item-main { flex: 1; min-width: 0; }
+.dd-item-main .mono-amt { font-size: 15px; }
+.dd-item-meta { margin-top: 3px; }
+.dd-note {
+  margin-top: 6px; padding: 5px 8px;
+  background: var(--paper); border-radius: 5px;
+  color: var(--ink-2);
+}
+.dd-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-mini {
+  height: 30px; padding: 0 11px; font-size: 12.5px;
+  border-radius: 6px;
+}
+
+.subform { padding-top: 2px; }
+.pay-note { margin-bottom: 12px; }

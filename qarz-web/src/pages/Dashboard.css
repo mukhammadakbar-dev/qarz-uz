@@ -1,0 +1,91 @@
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.stat { padding: 16px 18px; }
+.stat-label {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.tone-danger { color: var(--danger); }
+.tone-warn { color: var(--warn); }
+.tone-ink { color: var(--ink); }
+.stat-hint { margin-top: 5px; }
+
+/* chart */
+.chart-card { padding: 18px 20px 20px; }
+.chart-head { margin-bottom: 16px; align-items: flex-start; }
+.chart-title { font-size: 15px; font-weight: 600; }
+.legend { display: flex; gap: 14px; }
+.lg { position: relative; padding-left: 16px; font-size: 12.5px; color: var(--ink-2); }
+.lg::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%); width: 10px; height: 10px; border-radius: 3px;
+}
+.lg-cash::before { background: #9aa4b8; }
+.lg-debt::before { background: var(--accent); }
+
+.chart-body { position: relative; }
+.chart-svg { width: 100%; height: 180px; display: block; }
+.chart-empty {
+  height: 180px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 13.5px;
+  padding: 0 20px;
+}
+
+.chart-tip {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  min-width: 150px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
+.tip-date { font-weight: 600; margin-bottom: 6px; opacity: 0.9; }
+.tip-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 0; color: rgba(255,255,255,0.85);
+}
+.tip-row b { margin-left: auto; color: #fff; }
+.tip-total { border-top: 1px solid rgba(255,255,255,0.18); margin-top: 4px; padding-top: 5px; }
+.dot { width: 8px; height: 8px; border-radius: 2px; }
+.dot-cash { background: #9aa4b8; }
+.dot-debt { background: #7f8cf0; }
+
+/* skeleton */
+.sk {
+  position: relative; overflow: hidden;
+  background: var(--surface); min-height: 92px;
+}
+.sk::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.03), transparent);
+  animation: shimmer 1.3s infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+@media (max-width: 860px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 460px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .legend { flex-direction: column; gap: 4px; }
+}
