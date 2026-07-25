@@ -1,0 +1,15 @@
+.broadcast-open {
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+.broadcast-card {
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.broadcast-textarea {
+  height: auto;
+  min-height: 80px;
+  resize: vertical;
+}
+.broadcast-foot { margin-top: 10px; align-items: center; }
+.broadcast-hint { margin-top: 8px; line-height: 1.4; }

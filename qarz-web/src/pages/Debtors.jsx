@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api.js';
 import { som } from '../lib/format.js';
+import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../components/Toast.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
@@ -16,6 +17,8 @@ const FILTERS = [
 
 export default function Debtors() {
   const toast = useToast();
+  const { user } = useAuth();
+  const isPersonal = user?.role === 'personal';
   const [debtors, setDebtors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -89,7 +92,14 @@ export default function Debtors() {
               <tr>
                 <th>Mijoz</th>
                 <th>Telefon</th>
-                <th style={{ textAlign: 'right' }}>Qoldiq qarz</th>
+                {isPersonal ? (
+                  <>
+                    <th style={{ textAlign: 'right' }}>Menga qarzdor</th>
+                    <th style={{ textAlign: 'right' }}>Men qarzdorman</th>
+                  </>
+                ) : (
+                  <th style={{ textAlign: 'right' }}>Qoldiq qarz</th>
+                )}
                 <th style={{ textAlign: 'center', width: 90 }}>Yozuvlar</th>
               </tr>
             </thead>
@@ -103,11 +113,26 @@ export default function Debtors() {
                     </div>
                   </td>
                   <td className="muted num">{d.phone || '—'}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span className={`mono-amt ${Number(d.outstanding) > 0 ? 'amt-due' : 'muted'}`}>
-                      {som(d.outstanding)}
-                    </span>
-                  </td>
+                  {isPersonal ? (
+                    <>
+                      <td style={{ textAlign: 'right' }}>
+                        <span className={`mono-amt ${Number(d.outstanding_given) > 0 ? 'amt-due' : 'muted'}`}>
+                          {som(d.outstanding_given)}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span className={`mono-amt ${Number(d.outstanding_taken) > 0 ? 'amt-owe' : 'muted'}`}>
+                          {som(d.outstanding_taken)}
+                        </span>
+                      </td>
+                    </>
+                  ) : (
+                    <td style={{ textAlign: 'right' }}>
+                      <span className={`mono-amt ${Number(d.outstanding) > 0 ? 'amt-due' : 'muted'}`}>
+                        {som(d.outstanding)}
+                      </span>
+                    </td>
+                  )}
                   <td style={{ textAlign: 'center' }} className="muted num">{d.debt_count}</td>
                 </tr>
               ))}
@@ -132,8 +157,12 @@ export default function Debtors() {
         {selected && (
           <DebtorDetail
             debtor={selected}
-            onChanged={load}
+            onChanged={(updated) => {
+              if (updated) setSelected((s) => (s ? { ...s, ...updated } : s));
+              load();
+            }}
             notify={toast}
+            onClose={() => setSelected(null)}
           />
         )}
       </Modal>

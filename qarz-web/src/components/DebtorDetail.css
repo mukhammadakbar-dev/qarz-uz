@@ -40,3 +40,27 @@
 
 .subform { padding-top: 2px; }
 .pay-note { margin-bottom: 12px; }
+
+.dd-head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.dd-summary .dd-phone { margin-left: auto; }
+.dd-summary .dd-phone + .dd-head-actions { margin-left: 0; }
+.btn-icon { width: 38px; padding: 0; }
+.btn-icon-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-soft);
+}
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover { filter: brightness(0.94); background: var(--danger); }
+.field-error {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin: -6px 0 12px;
+}
+.confirm-text { margin-bottom: 8px; line-height: 1.5; }
+
+.dd-split { display: flex; gap: 24px; }

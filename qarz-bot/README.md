@@ -63,3 +63,17 @@ src/
 - Sessiyalar hozircha `.sessions.json` faylida saqlanadi (soddalik uchun). Ishlab chiqarishda Redis yoki backend DB'ga ko'chirish tavsiya etiladi.
 - Webhook rejimi qo'llab-quvvatlanadi: `.env` da `USE_WEBHOOK=true` va `WEBHOOK_URL` ni bering.
 - Bildirishnoma yuborish (eslatma) backend cron'i tomonidan Telegram Bot API orqali amalga oshiriladi — bot bu xabarlarni qabul qiluvchi kanal.
+
+## ⚠️ Muhim: BOT_SHARED_SECRET
+
+`.env`dagi `BOT_SHARED_SECRET` backend'dagi xuddi shu qiymatga teng bo'lishi **shart** — aks holda `/register` orqali ro'yxatdan o'tish ishlamay qoladi (backend OTP so'raydi, bot esa buni hal qila olmaydi).
+
+---
+
+# Tuzatish: "Men qarzdorman" yo'nalishi endi ishlaydi
+
+Oldin `direction` hamma joyda qattiq `'given'` deb kodlangan edi — oddiy foydalanuvchi hech qachon "men qarzdorman" yozuvini kirita olmasdi (TZ 3.3-band talabi buzilgan edi).
+
+**Tuzatildi:** `addDebtConversation` endi `sess.role === 'personal'` bo'lganda qarz yozish oqimida yo'nalish so'raydi (inline tugmalar: "➕ Menga qarzdor" / "➖ Men qarzdorman"). Do'kon egasi/xodim uchun xatti-harakat o'zgarmagan — ular hamon avtomatik `given`.
+
+Tekshirildi: barcha 42 ta tarjima kaliti ikkala tilda ham mavjud, modul yuklanishi va bot yig'ilishi xatosiz, yo'nalish tanlash mantig'i (callback data parsing, xavfsiz standart qiymat bilan) unit-test qilindi.

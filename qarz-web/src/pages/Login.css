@@ -48,3 +48,15 @@
 .link-btn:hover { text-decoration: underline; }
 
 .auth-legal { margin-top: 20px; text-align: center; }
+
+.otp-input {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  font-weight: 600;
+  padding-left: 0.4em; /* offset trailing letter-spacing so digits look centred */
+}
+.auth-back {
+  display: block;
+  margin: 12px auto 0;
+}

@@ -89,3 +89,14 @@
   .stat-grid { grid-template-columns: 1fr; }
   .legend { flex-direction: column; gap: 4px; }
 }
+
+.range-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.range-custom { display: flex; align-items: center; gap: 8px; }
+.range-date { height: 34px; width: auto; font-size: 13px; }
+.chart-dim { opacity: 0.45; transition: opacity 0.15s; }

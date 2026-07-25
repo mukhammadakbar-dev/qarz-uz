@@ -6,6 +6,7 @@ import {
   registerShopCtrl,
   registerPersonalCtrl,
   loginCtrl,
+  requestRegisterOtpCtrl,
   requestTelegramLinkCtrl,
   confirmTelegramLinkCtrl,
   refreshCtrl,
@@ -41,6 +42,12 @@ const otpRequestLimiter = byIpAndPhone(60 * 60 * 1000, 5);
 // OTP verify: 10 per hour per (IP, phone) — per-code attempts also capped at 5 in the service
 const otpConfirmLimiter = byIpAndPhone(60 * 60 * 1000, 10);
 
+router.post(
+  '/register/request-otp',
+  otpRequestLimiter,
+  validate(schemas.requestRegisterOtp),
+  requestRegisterOtpCtrl
+);
 router.post('/register/shop', validate(schemas.registerShop), registerShopCtrl);
 router.post('/register/personal', validate(schemas.registerPersonal), registerPersonalCtrl);
 router.post('/login', validate(schemas.login), loginCtrl);

@@ -26,6 +26,9 @@ export default {
   ask_debtor_name: 'Qarzdorning ismini kiriting:',
   ask_debtor_phone:
     'Qarzdorning telefon raqamini kiriting (yoki o\'tkazib yuborish uchun "-"):',
+  ask_direction: 'Bu qanday yozuv?',
+  dir_given: '➕ Menga qarzdor',
+  dir_taken: '➖ Men qarzdorman',
   ask_amount: 'Qarz summasini kiriting (so\'mda):',
   ask_amount_invalid: 'Iltimos, to\'g\'ri summa kiriting (masalan: 50000).',
   ask_due_date:

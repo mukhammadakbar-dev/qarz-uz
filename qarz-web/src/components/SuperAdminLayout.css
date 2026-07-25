@@ -1,0 +1,13 @@
+/* Super Admin gets a visually distinct accent (slate/near-black mark) so it
+   never gets mistaken for the shop-owner panel, per the TZ's "completely
+   separate interface" requirement. */
+.sa-mark {
+  background: #1f2430;
+}
+:root[data-theme="dark"] .sa-mark {
+  background: #3a4356;
+}
+.sa-dot {
+  background: linear-gradient(135deg, #1f2430, #4a5468);
+}
+.sa-sidebar { border-right-color: var(--line-strong); }

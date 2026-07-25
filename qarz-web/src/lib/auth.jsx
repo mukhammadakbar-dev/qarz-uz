@@ -44,13 +44,20 @@ export const AuthProvider = ({ children }) => {
     return res;
   }, []);
 
+  const registerPersonal = useCallback(async (payload) => {
+    const res = await api.registerPersonal(payload);
+    tokenStore.set(res.accessToken, res.refreshToken);
+    setUser({ role: res.user.role, id: res.user.id, phone: res.user.phone });
+    return res;
+  }, []);
+
   const logout = useCallback(() => {
     tokenStore.clear();
     setUser(null);
   }, []);
 
   return (
-    <AuthCtx.Provider value={{ user, login, registerShop, logout }}>
+    <AuthCtx.Provider value={{ user, login, registerShop, registerPersonal, logout }}>
       {children}
     </AuthCtx.Provider>
   );

@@ -15,9 +15,52 @@ const issueTokens = (user) => ({
 /**
  * Register a shop owner: creates user + shop + trial subscription + sms balance + reminder defaults.
  */
-export const registerShopOwner = async ({ phone, password, fullName, shopName }) => {
+/**
+ * STEP 1 of web registration — send a confirmation code to the phone.
+ *
+ * Without this, anyone could register an account against a phone number they
+ * do not control (e.g. a real shop owner's number) and keep a password that
+ * survives any later Telegram re-linking. Proving control of the number first
+ * closes that hole.
+ *
+ * Unlike the telegram-link flow we do NOT hide whether the phone exists: the
+ * caller needs to know the number is taken so they can log in instead.
+ */
+export const requestRegisterOtp = async ({ phone }) => {
+  const normPhone = normalizePhone(phone);
+  if (!normPhone) throw new AppError('Telefon raqami notogri', 422, 'BAD_PHONE');
+
+  const { rows } = await query('SELECT id FROM users WHERE phone = $1', [normPhone]);
+  if (rows[0]) {
+    throw new AppError(
+      'Bu telefon raqami allaqachon royxatdan otgan. Kirish sahifasidan foydalaning.',
+      409,
+      'PHONE_TAKEN'
+    );
+  }
+
+  const { code, ttlMinutes } = await issueOtp(normPhone, 'register');
+  await sendSms(
+    normPhone,
+    `Qarz.uz: royxatdan otish uchun tasdiqlash kodi ${code}. Kod ${ttlMinutes} daqiqa amal qiladi. Bu kodni hech kimga bermang.`
+  );
+
+  return { sent: true };
+};
+
+/**
+ * Register a shop owner: creates user + shop + trial subscription + sms balance + reminder defaults.
+ *
+ * `skipOtp` is used only by the Telegram bot, where possession of the Telegram
+ * session plus a shared contact already proves control of the number.
+ */
+export const registerShopOwner = async ({ phone, password, fullName, shopName, otp, skipOtp = false }) => {
   const normPhone = normalizePhone(phone);
   if (!normPhone) throw new AppError('Telefon raqami noto\'g\'ri', 422, 'BAD_PHONE');
+
+  // Proof of phone ownership before an account (and password) is created.
+  if (!skipOtp) await verifyOtp(normPhone, otp, 'register');
+
   const hash = await bcrypt.hash(password, 10);
 
   return withTransaction(async (client) => {
@@ -58,10 +101,16 @@ export const registerShopOwner = async ({ phone, password, fullName, shopName })
 
 /**
  * Register a personal (free) user.
+ *
+ * `skipOtp` is used only by the Telegram bot (see registerShopOwner).
  */
-export const registerPersonal = async ({ phone, password, fullName }) => {
+export const registerPersonal = async ({ phone, password, fullName, otp, skipOtp = false }) => {
   const normPhone = normalizePhone(phone);
   if (!normPhone) throw new AppError('Telefon raqami noto\'g\'ri', 422, 'BAD_PHONE');
+
+  // Proof of phone ownership before an account (and password) is created.
+  if (!skipOtp) await verifyOtp(normPhone, otp, 'register');
+
   const hash = await bcrypt.hash(password, 10);
   const u = await query(
     `INSERT INTO users (role, phone, password_hash, full_name)

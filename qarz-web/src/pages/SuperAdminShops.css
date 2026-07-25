@@ -1,0 +1,6 @@
+.sa-stat-grid { margin-bottom: 18px; }
+.btn-mini-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-soft);
+}

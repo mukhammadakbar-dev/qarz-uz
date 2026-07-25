@@ -9,6 +9,7 @@ import {
   updatePlan,
   setShopActive,
   auditLog,
+  broadcast,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -22,5 +23,6 @@ router.get('/plans', listPlans);
 router.patch('/plans/:code', validate(adminSchemas.updatePlan), updatePlan);
 router.patch('/shops/:shopId/active', validate(adminSchemas.setShopActive), setShopActive);
 router.get('/audit-log', auditLog);
+router.post('/broadcast', validate(adminSchemas.broadcast), broadcast);
 
 export default router;

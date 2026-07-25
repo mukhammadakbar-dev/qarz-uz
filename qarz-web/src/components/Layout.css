@@ -108,3 +108,9 @@
   .logout { width: auto; padding: 0 12px; }
   .main { padding: 18px 16px 48px; }
 }
+
+.foot-actions { display: flex; gap: 8px; align-items: center; }
+.foot-actions .logout { flex: 1; }
+@media (max-width: 760px) {
+  .foot-actions .logout { flex: none; }
+}

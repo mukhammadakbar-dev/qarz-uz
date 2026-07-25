@@ -7,6 +7,8 @@ import {
   createDebtor,
   listDebtors,
   getDebtor,
+  updateDebtor,
+  deleteDebtor,
 } from '../controllers/debtor.controller.js';
 import {
   debtSchemas,
@@ -26,6 +28,8 @@ router.use(authenticate, authorize('shop_owner', 'staff', 'personal'));
 router.post('/debtors', enforceSubscription, validate(debtorSchemas.create), createDebtor);
 router.get('/debtors', validate(debtorSchemas.list, 'query'), listDebtors);
 router.get('/debtors/:id', getDebtor);
+router.patch('/debtors/:id', enforceSubscription, validate(debtorSchemas.update), updateDebtor);
+router.delete('/debtors/:id', enforceSubscription, deleteDebtor);
 router.get('/debtors/:debtorId/debts', debtorHistory);
 
 // --- Debts ---

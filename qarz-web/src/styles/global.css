@@ -211,3 +211,114 @@ textarea.input { height: auto; padding: 10px 12px; resize: vertical; min-height:
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   Dark theme — same token names, remapped values.
+   Applied via <html data-theme="dark">. Contrast checked to
+   stay at/above WCAG AA for body text and UI labels.
+   ============================================================ */
+:root[data-theme="dark"] {
+  --paper: #12151a;
+  --surface: #1a1e26;
+  --line: #2a303b;
+  --line-strong: #39414f;
+  --ink: #e8e9ee;
+  --ink-2: #b3b9c5;
+  --ink-3: #858d9c;
+
+  --accent: #7c8cff;
+  --accent-hover: #93a0ff;
+  --accent-soft: #22283d;
+
+  --ok: #4ade80;
+  --ok-soft: #14301f;
+  --warn: #fbbf24;
+  --warn-soft: #362a10;
+  --danger: #f87171;
+  --danger-soft: #3a1d1c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* Dark-mode surfaces that were hardcoded light */
+:root[data-theme="dark"] .toast { background: #2b3240; }
+:root[data-theme="dark"] .chart-tip { background: #2b3240; }
+:root[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, 0.62); }
+:root[data-theme="dark"] .user-dot {
+  background: linear-gradient(135deg, var(--accent), #5566dd);
+}
+
+/* Colour-scheme hint so native controls (date pickers, scrollbars) follow */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Smooth the switch, but never fight reduced-motion */
+body, .card, .sidebar, .input, .btn {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* ---------- Amount input ---------- */
+.amount-wrap { position: relative; display: block; }
+.amount-wrap .input { padding-right: 52px; }
+.amount-suffix {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12.5px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+/* ---------- Theme toggle ---------- */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: background 0.12s, color 0.12s;
+}
+.theme-toggle:hover { background: var(--paper); color: var(--ink); }
+
+/* ---------- Password reveal ---------- */
+.pw-wrap { position: relative; }
+.pw-wrap .input { padding-right: 42px; }
+.pw-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition: background 0.12s, color 0.12s;
+}
+.pw-toggle:hover { background: var(--paper); color: var(--ink); }
+
+/* ---------- Banner ---------- */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  margin-bottom: 16px;
+  font-size: 13.5px;
+}
+.banner-warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.banner-danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+.banner-text { flex: 1; }
+.banner strong { font-weight: 600; }

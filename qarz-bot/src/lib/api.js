@@ -23,9 +23,12 @@ export class SessionExpiredError extends ApiError {
   }
 }
 
-const rawFetch = async (path, { method = 'GET', body, token } = {}) => {
+const rawFetch = async (path, { method = 'GET', body, token, botSecret = false } = {}) => {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
+  // Proves this call came from our own bot, letting the backend skip the
+  // registration OTP (a shared Telegram contact already proves phone ownership).
+  if (botSecret && config.botSharedSecret) headers['x-bot-secret'] = config.botSharedSecret;
 
   let res;
   try {
@@ -120,6 +123,7 @@ export const api = {
     publicRequest('/api/auth/register/personal', {
       method: 'POST',
       body: { phone, password, fullName },
+      botSecret: true, // contact already shared in Telegram: no extra OTP needed
     }),
 
   // --- Debtors ---

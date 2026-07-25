@@ -69,10 +69,23 @@ export const api = {
   login: (phone, password) =>
     raw('/api/auth/login', { method: 'POST', body: { phone, password } }),
 
+  requestRegisterOtp: (phone) =>
+    raw('/api/auth/register/request-otp', { method: 'POST', body: { phone } }),
+
   registerShop: (payload) =>
     raw('/api/auth/register/shop', { method: 'POST', body: payload }),
 
+  registerPersonal: (payload) =>
+    raw('/api/auth/register/personal', { method: 'POST', body: payload }),
+
   dashboard: () => raw('/api/shop/dashboard'),
+
+  // --- Staff ---
+  listStaff: () => raw('/api/shop/staff'),
+  createStaff: (payload) => raw('/api/shop/staff', { method: 'POST', body: payload }),
+  setStaffActive: (id, active) =>
+    raw(`/api/shop/staff/${id}/active`, { method: 'PATCH', body: { active } }),
+  deleteStaff: (id) => raw(`/api/shop/staff/${id}`, { method: 'DELETE' }),
 
   salesRange: (from, to) => {
     const q = new URLSearchParams();
@@ -96,6 +109,11 @@ export const api = {
   createDebtor: (payload) =>
     raw('/api/debtors', { method: 'POST', body: payload }),
 
+  updateDebtor: (id, payload) =>
+    raw(`/api/debtors/${id}`, { method: 'PATCH', body: payload }),
+
+  deleteDebtor: (id) => raw(`/api/debtors/${id}`, { method: 'DELETE' }),
+
   debtorHistory: (debtorId) => raw(`/api/debtors/${debtorId}/debts`),
 
   addDebt: (payload) => raw('/api/debts', { method: 'POST', body: payload }),
@@ -105,4 +123,22 @@ export const api = {
 
   paymentLink: (debtId) =>
     raw(`/api/debts/${debtId}/payment-link`, { method: 'POST' }),
+
+  // --- Super Admin ---
+  adminShops: ({ search, plan, status } = {}) => {
+    const q = new URLSearchParams();
+    if (search) q.set('search', search);
+    if (plan) q.set('plan', plan);
+    if (status) q.set('status', status);
+    const qs = q.toString();
+    return raw(`/api/admin/shops${qs ? '?' + qs : ''}`);
+  },
+  adminStats: () => raw('/api/admin/stats'),
+  adminPlans: () => raw('/api/admin/plans'),
+  adminUpdatePlan: (code, payload) =>
+    raw(`/api/admin/plans/${code}`, { method: 'PATCH', body: payload }),
+  adminSetShopActive: (shopId, active) =>
+    raw(`/api/admin/shops/${shopId}/active`, { method: 'PATCH', body: { active } }),
+  adminAuditLog: () => raw('/api/admin/audit-log'),
+  adminBroadcast: (message) => raw('/api/admin/broadcast', { method: 'POST', body: { message } }),
 };

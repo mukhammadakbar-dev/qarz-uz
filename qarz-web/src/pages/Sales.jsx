@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { som, grp, fmtDate, todayISO } from '../lib/format.js';
+import { grp, fmtDate, todayISO, parseInputAmount } from '../lib/format.js';
+import AmountInput from '../components/AmountInput.jsx';
 import { useToast } from '../components/Toast.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import './Sales.css';
@@ -31,7 +32,7 @@ export default function Sales() {
 
   const save = async (e) => {
     e.preventDefault();
-    const val = Number(String(cash).replace(/[^\d.]/g, ''));
+    const val = parseInputAmount(cash);
     if (!(val >= 0) || cash === '') return toast('Summani kiriting', 'error');
     setBusy(true);
     try {
@@ -59,9 +60,8 @@ export default function Sales() {
               onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="field">
-            <label>Naqd / karta savdo (so'm)</label>
-            <input className="input" value={cash} onChange={(e) => setCash(e.target.value)}
-              placeholder="1 200 000" inputMode="numeric" autoFocus />
+            <label>Naqd / karta savdo</label>
+            <AmountInput value={cash} onChange={setCash} placeholder="1 200 000" autoFocus />
           </div>
           <button className="btn btn-primary btn-block" disabled={busy}>
             {busy ? <span className="spinner" /> : 'Saqlash'}

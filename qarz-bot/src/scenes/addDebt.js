@@ -80,6 +80,19 @@ export async function addDebtConversation(conversation, ctx) {
     phone = raw === '-' ? undefined : raw;
   }
 
+  // 3b) Direction — only meaningful for personal (free) users, who track a
+  // two-way ledger. Shop owners only ever record debts owed TO the shop.
+  let direction = 'given';
+  if (sess.role === 'personal') {
+    const kb = new InlineKeyboard()
+      .text(t('dir_given', lang), 'dir:given')
+      .text(t('dir_taken', lang), 'dir:taken');
+    await ctx.reply(t('ask_direction', lang), { reply_markup: kb });
+    const cq = await conversation.waitFor('callback_query:data');
+    await cq.answerCallbackQuery();
+    direction = cq.callbackQuery.data.split(':')[1] === 'taken' ? 'taken' : 'given';
+  }
+
   // 4) Amount
   let amount;
   while (true) {
@@ -119,7 +132,7 @@ export async function addDebtConversation(conversation, ctx) {
       debtorId = debtor.id;
     }
     await conversation.external(() =>
-      api.addDebt(tgId, { debtorId, direction: 'given', amount, dueDate, note })
+      api.addDebt(tgId, { debtorId, direction, amount, dueDate, note })
     );
     await ctx.reply(
       t('debt_created', lang, {

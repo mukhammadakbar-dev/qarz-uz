@@ -109,4 +109,12 @@ export const config = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
   },
+
+  /**
+   * Shared secret proving a request came from our own Telegram bot (sent as the
+   * x-bot-secret header). Lets the bot skip the registration OTP, since a shared
+   * contact in a Telegram session already proves phone ownership.
+   * If unset, the bot gets no privilege and must supply an OTP like anyone else.
+   */
+  botSharedSecret: process.env.BOT_SHARED_SECRET || '',
 };

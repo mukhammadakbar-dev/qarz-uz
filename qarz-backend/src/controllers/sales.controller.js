@@ -82,11 +82,37 @@ export const dashboard = asyncHandler(async (req, res) => {
     [shopId]
   );
 
+  // Trial/subscription state so the UI can warn before write access is lost
+  const subRow = await query(
+    `SELECT plan, status, ends_at FROM subscriptions
+     WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [shopId]
+  );
+  const sub = subRow.rows[0] || null;
+  let subscription = null;
+  if (sub) {
+    const endsAt = new Date(sub.ends_at);
+    const msLeft = endsAt.getTime() - Date.now();
+    // Round up: a subscription ending in 2 hours still counts as "1 day left"
+    const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
+    const expired = msLeft <= 0 || sub.status === 'expired' || sub.status === 'blocked';
+    subscription = {
+      plan: sub.plan,
+      status: expired ? 'expired' : sub.status,
+      endsAt: sub.ends_at,
+      trialEndsAt: sub.status === 'trial' ? sub.ends_at : null,
+      daysLeft: expired ? 0 : daysLeft,
+      isTrial: sub.status === 'trial',
+      canWrite: !expired,
+    };
+  }
+
   res.json({
     totalOutstanding: Number(outstanding.rows[0].total),
     overdueCount: Number(overdue.rows[0].cnt),
     overdueTotal: Number(overdue.rows[0].total),
     monthlyTurnover: Number(monthly.rows[0].turnover),
     sms: smsBalance.rows[0] || null,
+    subscription,
   });
 });

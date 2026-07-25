@@ -158,3 +158,83 @@ Takroriy Complete → `-4 ALREADY_PAID` (avval `-6` edi), ikki marta hisoblanmay
 npm run migrate   # schema.sql + migrations/*.sql (idempotent)
 ```
 `002_otp_and_reminders.sql` faqat qo'shimcha (additive) — mavjud ma'lumot buzilmaydi.
+
+---
+
+# Qo'shimcha: ro'yxatdan o'tish OTP, mijoz CRUD, obuna holati
+
+## 0. Ro'yxatdan o'tishda telefon tasdiqlash
+
+```bash
+# 1-bosqich: kod so'rash
+curl -X POST http://localhost:4000/api/auth/register/request-otp \
+  -H 'Content-Type: application/json' -d '{"phone":"901234567"}'
+# -> {"sent":true}   yoki   409 PHONE_TAKEN agar raqam band bo'lsa
+
+# 2-bosqich: kod bilan do'kon ochish
+curl -X POST http://localhost:4000/api/auth/register/shop \
+  -H 'Content-Type: application/json' \
+  -d '{"phone":"901234567","password":"parol123","shopName":"Test","otp":"482913"}'
+```
+Telegram bot `x-bot-secret` header orqali (`.env`dagi `BOT_SHARED_SECRET`) bu OTP'ni chetlab o'tadi — chunki kontakt ulashish allaqachon tasdiq hisoblanadi. Bu imtiyoz **faqat server tomonidagi maxfiy kalit** orqali beriladi, so'rov tanasidagi (`body`) hech qanday maydon orqali emas.
+
+## 3. Mijozni tahrirlash / arxivlash
+```bash
+curl -X PATCH http://localhost:4000/api/debtors/$ID \
+  -H "Authorization: Bearer $TOKEN" -d '{"fullName":"Yangi Ism"}'
+
+curl -X DELETE http://localhost:4000/api/debtors/$ID -H "Authorization: Bearer $TOKEN"
+# -> 409 HAS_OPEN_DEBTS agar to'lanmagan qarz bo'lsa
+```
+O'chirish emas — **arxivlash** (`is_archived`), tarix saqlanadi.
+
+## 8. Dashboard'da obuna holati
+`GET /api/shop/dashboard` javobiga qo'shildi:
+```json
+"subscription": { "status": "trial", "daysLeft": 3, "isTrial": true, "canWrite": true }
+```
+
+## Testlar
+```bash
+node tests/register_otp_test.mjs   # ro'yxatdan o'tish OTP + validatsiya (22 ta)
+```
+Jami: **87 ta test, 0 ta xato** (`for f in tests/*.mjs; do node $f; done`).
+
+## Yangi migratsiya
+`003_debtor_archive.sql` — `debtors.is_archived` (additive, backward-compatible).
+
+## ⚠️ Muhim: bot bilan bog'lash uchun BOT_SHARED_SECRET
+
+Telegram bot ro'yxatdan o'tishda SMS-OTP bosqichini o'tkazib yuborishi uchun `.env`da `BOT_SHARED_SECRET` **majburiy** o'rnatilishi kerak, va u `qarz-bot`ning o'z `.env`idagi xuddi shu qiymatga teng bo'lishi shart:
+
+```bash
+openssl rand -hex 24   # ikkala .env fayliga ham shu qiymatni qo'ying
+```
+
+Agar bu o'rnatilmasa: bot orqali ro'yxatdan o'tish **buziladi** — backend oddiy OTP talab qiladi, lekin bot buni so'ramaydi, natijada foydalanuvchi "Kod topilmadi" xatosini ko'radi. Tekshirilgan: `tests/bot_secret_test.mjs`.
+
+---
+
+# ⚠️ KRITIK TUZATISH — Super Admin panelining 403 xatosi
+
+**Muammo:** `app.js`da `debtRoutes` `/api` prefiksi bilan `/api/shop` va `/api/admin`dan **oldin** mount qilingan edi. Express `app.use()`ni ro'yxatdan o'tish tartibida, prefiks bo'yicha moslashtiradi — shuning uchun `/api/admin/*`ga har qanday so'rov avval `debtRoutes`ning o'z `authorize('shop_owner','staff','personal')` tekshiruvidan o'tishga majbur bo'lardi. Do'kon egalari uchun bu ko'rinmas edi (ular shu ro'yxatda bor, mos marshrut topilmagani uchun keyingi mount'ga o'tib ketardi), lekin **`super_admin` uchun har doim `403` bilan rad etilardi** — `adminRoutes`ga umuman yetib bormasdan.
+
+**Natija:** Super Admin panelining **hamma** backend endpoint'i (`/api/admin/shops`, `/stats`, `/plans`, `/audit-log`, va h.k.) ishlamasdi. Bu www darajasida hech qachon ushlanmagan edi, chunki frontend testlari tarmoqni mock qilgan, real backend'ga tegmagan edi.
+
+**Tuzatish:** `app.js`da mount tartibi o'zgartirildi — aniqroq prefikslar (`/api/shop`, `/api/admin`) umumiy `/api` prefiksidan **oldin** ro'yxatdan o'tkaziladi.
+
+**Tekshirildi:** `tests/route_order_test.mjs` — 9 ta test, jumladan `super_admin`ning barcha `/api/admin/*`ga kirishi va `shop_owner`ning bloklanishi.
+
+## Yangi: Broadcast (xabar yuborish)
+
+TZ 4.6-band, 9-band: "Barcha do'kon egalariga tizim xabarini yuborish". Endi to'liq ishlaydi:
+
+```bash
+curl -X POST http://localhost:4000/api/admin/broadcast \
+  -H "Authorization: Bearer $SUPER_ADMIN_TOKEN" \
+  -d '{"message":"Ertaga 02:00-04:00 texnik ishlar bo'\''ladi"}'
+# -> {"ok":true,"totalOwners":12,"telegramSent":9,"smsSent":2,"failed":1}
+```
+Telegram bog'langan bo'lsa Telegram orqali, aks holda SMS orqali — debtor eslatmalari bilan bir xil kanal tanlash mantig'i. Audit log'ga yoziladi. Tekshirildi: `tests/broadcast_test.mjs` (12 ta).
+
+Jami: **128 ta backend test, 0 ta xato**.

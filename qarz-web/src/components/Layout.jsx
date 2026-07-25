@@ -1,16 +1,36 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import { useTheme } from '../lib/theme.jsx';
+import { Sun, Moon, Shield } from './icons.jsx';
 import './Layout.css';
 
-const nav = [
+const shopNav = [
   { to: '/', label: 'Boshqaruv paneli', end: true, icon: GridIcon },
   { to: '/debtors', label: 'Qarzdorlar', icon: UsersIcon },
   { to: '/sales', label: 'Kunlik savdo', icon: ChartIcon },
 ];
+// Personal (free) users have no shop, so no dashboard stats or daily sales —
+// just their own two-directional debt ledger.
+const personalNav = [
+  { to: '/', label: 'Mening qarzlarim', end: true, icon: UsersIcon },
+];
+// Staff management is owner-only on the backend (authorize('shop_owner')),
+// so hide the link entirely for staff accounts rather than show a page that
+// always errors on submit.
+const ownerOnlyNav = [
+  { to: '/staff', label: 'Xodimlar', icon: StaffIcon },
+];
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
+  const nav =
+    user?.role === 'personal'
+      ? personalNav
+      : user?.role === 'shop_owner'
+        ? [...shopNav, ...ownerOnlyNav]
+        : shopNav;
 
   const handleLogout = () => {
     logout();
@@ -26,6 +46,15 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="nav">
+          {user?.role === 'super_admin' && (
+            <NavLink
+              to="/super-admin"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <Shield />
+              <span>Super Admin</span>
+            </NavLink>
+          )}
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -47,7 +76,17 @@ export default function Layout({ children }) {
               <div className="user-role">Admin</div>
             </div>
           </div>
-          <button className="logout" onClick={handleLogout}>Chiqish</button>
+          <div className="foot-actions">
+            <button className="logout" onClick={handleLogout}>Chiqish</button>
+            <button
+              className="theme-toggle"
+              onClick={toggle}
+              aria-label={isDark ? 'Yorug\' rejim' : 'Qorong\'i rejim'}
+              title={isDark ? 'Yorug\' rejim' : 'Qorong\'i rejim'}
+            >
+              {isDark ? <Sun /> : <Moon />}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -70,6 +109,15 @@ function UsersIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
       <path d="M16 5.5a3 3 0 0 1 0 5.8M18 20c0-2.4-1-4.4-2.6-5.6" />
+    </svg>
+  );
+}
+function StaffIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="7" width="18" height="13" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 12h18" />
     </svg>
   );
 }

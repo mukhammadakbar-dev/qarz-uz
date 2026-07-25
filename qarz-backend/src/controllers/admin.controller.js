@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { asyncHandler, NotFound } from '../utils/errors.js';
 import { query } from '../db/pool.js';
+import { sendTelegramMessage } from '../services/telegram.service.js';
+import { sendSms } from '../services/sms.service.js';
 
 export const adminSchemas = {
   listShops: z.object({
@@ -18,7 +20,9 @@ export const adminSchemas = {
     advancedStats: z.boolean().optional(),
   }),
   setShopActive: z.object({ active: z.boolean() }),
-  broadcast: z.object({ message: z.string().min(1) }),
+  broadcast: z.object({
+    message: z.string().min(1, 'Xabar bo\'sh bo\'lmasligi kerak').max(1000, 'Xabar juda uzun'),
+  }),
 };
 
 const logAction = (actorId, action, meta) =>
@@ -158,4 +162,57 @@ export const auditLog = asyncHandler(async (_req, res) => {
      ORDER BY a.created_at DESC LIMIT 200`
   );
   res.json(rows);
+});
+
+/**
+ * POST /api/admin/broadcast — send a system announcement to every active
+ * shop owner (TZ 4.6 item 9: "Xabarnoma/E'lon yuborish").
+ *
+ * Uses the same channel-selection rule as debtor reminders: Telegram if the
+ * owner has linked an account, SMS otherwise. This is a platform-wide notice
+ * to shop owners, not tied to any single shop's SMS balance/quota, so it does
+ * not touch `sms_balance` — that table tracks per-shop debtor-reminder spend.
+ */
+export const broadcast = asyncHandler(async (req, res) => {
+  const { message } = req.body;
+
+  const { rows: owners } = await query(
+    `SELECT id, phone, telegram_id, full_name FROM users
+     WHERE role = 'shop_owner' AND is_active = TRUE`
+  );
+
+  let telegramSent = 0;
+  let smsSent = 0;
+  let failed = 0;
+
+  for (const owner of owners) {
+    const text = `\uD83D\uDCE2 Qarz.uz: ${message}`;
+    let result;
+    if (owner.telegram_id) {
+      result = await sendTelegramMessage(owner.telegram_id, text);
+      if (result.ok) telegramSent++;
+    } else if (owner.phone) {
+      result = await sendSms(owner.phone, text);
+      if (result.ok) smsSent++;
+    } else {
+      result = { ok: false, error: 'no contact channel' };
+    }
+    if (!result.ok) failed++;
+  }
+
+  await logAction(req.user.id, 'broadcast', {
+    message,
+    totalOwners: owners.length,
+    telegramSent,
+    smsSent,
+    failed,
+  });
+
+  res.json({
+    ok: true,
+    totalOwners: owners.length,
+    telegramSent,
+    smsSent,
+    failed,
+  });
 });
