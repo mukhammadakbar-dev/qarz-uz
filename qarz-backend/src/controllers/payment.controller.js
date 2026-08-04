@@ -121,13 +121,32 @@ export const clickComplete = asyncHandler(async (req, res) => {
     });
   }
 
-  // record payment against the debt and mark link used
-  await recordPayment({
-    debtId: link.debt_id,
-    amount: Number(p.amount),
-    method: 'click',
-    transactionId: String(p.click_trans_id),
-  });
+  // Record payment against the debt and mark link used.
+  //
+  // Two concurrent retries of the same callback both get past the duplicate
+  // check above; the unique index on (debt_id, method, transaction_id) makes
+  // the loser fail here. That is the same situation as the pre-checked
+  // duplicate, so answer Click identically instead of returning a 500.
+  try {
+    await recordPayment({
+      debtId: link.debt_id,
+      amount: Number(p.amount),
+      method: 'click',
+      transactionId: String(p.click_trans_id),
+    });
+  } catch (err) {
+    if (err.code === 'DUPLICATE_PAYMENT' || err.code === 'ALREADY_PAID') {
+      await query(`UPDATE payment_links SET status = 'used' WHERE id = $1`, [link.id]);
+      return res.json({
+        click_trans_id: p.click_trans_id,
+        merchant_trans_id: p.merchant_trans_id,
+        merchant_confirm_id: link.id,
+        error: CLICK_ALREADY_PAID,
+        error_note: 'Already paid',
+      });
+    }
+    throw err;
+  }
   await query(`UPDATE payment_links SET status = 'used' WHERE id = $1`, [link.id]);
 
   // confirmation to debtor happens via notification worker / could be triggered here

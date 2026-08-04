@@ -97,7 +97,6 @@ export default function DebtorDetail({ debtor, onChanged, notify, onClose }) {
       ) : (
         <div className="dd-list">
           {debts.map((d) => {
-            const left = Number(d.amount) - Number(d.paid_amount);
             const meta = statusMeta[d.status] || statusMeta.open;
             return (
               <div key={d.id} className="dd-item">
@@ -140,12 +139,20 @@ export default function DebtorDetail({ debtor, onChanged, notify, onClose }) {
 }
 
 const makeLink = async (debtId, notify) => {
+  let url;
   try {
-    const { url } = await api.paymentLink(debtId);
-    await navigator.clipboard.writeText(url).catch(() => {});
-    notify('To\'lov linki nusxalandi');
+    ({ url } = await api.paymentLink(debtId));
   } catch (err) {
-    notify(err.message, 'error');
+    return notify(err.message, 'error');
+  }
+  // navigator.clipboard is undefined outside a secure context (plain http),
+  // where the old code threw a TypeError that surfaced as a link-creation
+  // failure — even though the link had in fact been created. Show it instead.
+  try {
+    await navigator.clipboard.writeText(url);
+    notify('To\'lov linki nusxalandi');
+  } catch {
+    notify(`To'lov linki: ${url}`);
   }
 };
 
@@ -267,7 +274,7 @@ function PayDebt({ debt, onDone, onCancel, notify }) {
 
 // Mirrors the backend rule so users get instant feedback instead of a round trip.
 const NAME_RE = /^[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳÀ-ÿʻʼ'’\-\s.]+$/u;
-const PHONE_RE = /^[\d\s()+\-]{7,20}$/;
+const PHONE_RE = /^[\d\s()+-]{7,20}$/;
 
 export function validateDebtorFields({ fullName, phone, requireContact = true }) {
   if (!fullName || fullName.trim().length < 2) return "Ism kamida 2 belgidan iborat bo'lishi kerak";

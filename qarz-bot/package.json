@@ -5,12 +5,17 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "node --dns-result-order=ipv4first src/index.js",
+    "dev": "node --dns-result-order=ipv4first --watch src/index.js",
+    "test": "node tests/run-all.mjs",
+    "lint": "oxlint"
   },
   "dependencies": {
     "@grammyjs/conversations": "^1.2.0",
     "dotenv": "^16.4.5",
     "grammy": "^1.30.0"
+  },
+  "devDependencies": {
+    "oxlint": "^1.71.0"
   }
 }

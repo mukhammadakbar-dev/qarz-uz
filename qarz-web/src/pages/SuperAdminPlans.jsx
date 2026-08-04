@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api.js';
-import { grp, parseInputAmount } from '../lib/format.js';
+import { parseInputAmount } from '../lib/format.js';
 import AmountInput from '../components/AmountInput.jsx';
 import { useToast } from '../components/Toast.jsx';
 import PageHeader from '../components/PageHeader.jsx';

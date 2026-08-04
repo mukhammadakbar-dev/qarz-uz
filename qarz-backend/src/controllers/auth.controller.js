@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { z } from 'zod';
 import { asyncHandler } from '../utils/errors.js';
 import {
@@ -7,29 +8,45 @@ import {
   login,
   requestTelegramLink,
   confirmTelegramLink,
+  getVerifyStatus,
+  confirmVerifyToken,
+  directLinkByContact,
 } from '../services/auth.service.js';
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from '../utils/tokens.js';
 import { Unauthorized } from '../utils/errors.js';
+import { query } from '../db/pool.js';
 import { config } from '../config/index.js';
 
 const otpField = z.string().regex(/^\d{6}$/, 'Kod 6 xonali bo\'lishi kerak');
 
+// 32 random bytes, hex-encoded, issued by the Telegram registration handshake
+const verifyTokenField = z.string().regex(/^[a-f0-9]{64}$/, 'Token yaroqsiz');
+// Telegram user ids are positive and comfortably inside the safe-integer range
+const telegramIdField = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
 export const schemas = {
   requestRegisterOtp: z.object({
     phone: z.string().min(7),
+    // Was missing, so zod silently stripped it and every request fell through
+    // to the SMS branch — the "Telegram orqali kod olish" button never worked.
+    channel: z.enum(['sms', 'telegram']).optional(),
   }),
   registerShop: z.object({
     phone: z.string().min(7),
     password: z.string().min(6),
     fullName: z.string().min(1).optional(),
     shopName: z.string().min(1),
-    otp: otpField.optional(), // required unless the trusted bot secret is presented
+    // one of these proves phone ownership, unless the trusted bot secret is
+    // presented (see isTrustedBot)
+    otp: otpField.optional(),
+    verifyToken: verifyTokenField.optional(),
   }),
   registerPersonal: z.object({
     phone: z.string().min(7),
     password: z.string().min(6),
     fullName: z.string().min(1).optional(),
     otp: otpField.optional(),
+    verifyToken: verifyTokenField.optional(),
   }),
   login: z.object({
     phone: z.string().min(7),
@@ -40,9 +57,20 @@ export const schemas = {
   }),
   confirmTelegramLink: z.object({
     phone: z.string().min(7),
-    telegramId: z.number().int(),
+    telegramId: telegramIdField,
     otp: otpField,
   }),
+  confirmVerifyToken: z.object({
+    token: verifyTokenField,
+    telegramId: telegramIdField,
+    // proven by the bot from a shared contact card, not typed by the user
+    phone: z.string().min(7),
+  }),
+  directLink: z.object({
+    phone: z.string().min(7),
+    telegramId: telegramIdField,
+  }),
+  verifyStatusParam: z.object({ token: verifyTokenField }),
   refresh: z.object({ refreshToken: z.string().min(10) }),
 };
 
@@ -57,7 +85,12 @@ const isTrustedBot = (req) => {
   const secret = config.botSharedSecret;
   if (!secret) return false;
   const provided = req.get('x-bot-secret');
-  return typeof provided === 'string' && provided.length > 0 && provided === secret;
+  if (typeof provided !== 'string' || provided.length === 0) return false;
+  // Constant-time compare so the secret can't be recovered byte-by-byte by
+  // timing the response. Buffers must match in length for timingSafeEqual.
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(secret, 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
 
 export const requestRegisterOtpCtrl = asyncHandler(async (req, res) => {
@@ -107,8 +140,46 @@ export const refreshCtrl = asyncHandler(async (req, res) => {
   } catch {
     throw Unauthorized('Refresh token yaroqsiz');
   }
+
+  // Re-read the account instead of trusting the token's copy of the role: a
+  // 30-day refresh token would otherwise keep minting access tokens for an
+  // account that has since been blocked, deleted, or had its role changed.
+  const { rows } = await query('SELECT id, role, is_active FROM users WHERE id = $1', [
+    payload.sub,
+  ]);
+  const user = rows[0];
+  if (!user || !user.is_active) throw Unauthorized('Foydalanuvchi faol emas');
+
   res.json({
-    accessToken: signAccessToken({ sub: payload.sub, role: payload.role }),
-    refreshToken: signRefreshToken({ sub: payload.sub, role: payload.role }),
+    accessToken: signAccessToken({ sub: user.id, role: user.role }),
+    refreshToken: signRefreshToken({ sub: user.id, role: user.role }),
   });
 });
+
+export const getVerifyStatusCtrl = asyncHandler(async (req, res) => {
+  const result = await getVerifyStatus(req.params.token);
+  res.json(result);
+});
+
+/**
+ * Bot-only: completes the Telegram registration handshake. Requires the shared
+ * secret because the caller asserts a phone number proven by a Telegram contact
+ * card — an assertion only our own bot is in a position to make truthfully.
+ */
+export const confirmVerifyTokenCtrl = asyncHandler(async (req, res) => {
+  if (!isTrustedBot(req)) throw Unauthorized('Faqat bot uchun');
+  const result = await confirmVerifyToken(
+    req.body.token,
+    req.body.telegramId,
+    req.body.phone
+  );
+  res.json(result);
+});
+
+export const directLinkByContactCtrl = asyncHandler(async (req, res) => {
+  if (!isTrustedBot(req)) throw Unauthorized('Faqat bot uchun');
+  const result = await directLinkByContact(req.body);
+  res.json(result);
+});
+
+

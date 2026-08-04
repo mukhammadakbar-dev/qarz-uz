@@ -1,0 +1,11 @@
+{
+  "$schema": "../qarz-web/node_modules/oxlint/configuration_schema.json",
+  "env": { "node": true, "es2024": true },
+  "plugins": ["oxc", "unicorn"],
+  "rules": {
+    "no-undef": "error",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "unicorn/no-invalid-fetch-options": "error"
+  },
+  "ignorePatterns": ["node_modules"]
+}

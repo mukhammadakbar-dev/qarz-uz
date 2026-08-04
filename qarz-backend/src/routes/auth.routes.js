@@ -10,6 +10,9 @@ import {
   requestTelegramLinkCtrl,
   confirmTelegramLinkCtrl,
   refreshCtrl,
+  getVerifyStatusCtrl,
+  confirmVerifyTokenCtrl,
+  directLinkByContactCtrl,
 } from '../controllers/auth.controller.js';
 import { normalizePhone } from '../utils/phone.js';
 
@@ -78,5 +81,24 @@ router.post('/telegram/link', (_req, res) => {
 });
 
 router.post('/refresh', validate(schemas.refresh), refreshCtrl);
+
+// --- Telegram registration handshake ---
+// Polled by the registration page; returns only a boolean, never the proof.
+router.get(
+  '/verify-status/:token',
+  validate(schemas.verifyStatusParam, 'params'),
+  getVerifyStatusCtrl
+);
+// Bot-only (shared secret enforced in the controller).
+router.post(
+  '/telegram/confirm-verify-token',
+  validate(schemas.confirmVerifyToken),
+  confirmVerifyTokenCtrl
+);
+router.post(
+  '/telegram/direct-link',
+  validate(schemas.directLink),
+  directLinkByContactCtrl
+);
 
 export default router;

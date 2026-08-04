@@ -4,25 +4,61 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
+import { config } from './config/index.js';
+
 import authRoutes from './routes/auth.routes.js';
 import debtRoutes from './routes/debt.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
+import configRoutes from './routes/config.routes.js';
 
 import { notFoundHandler, errorHandler } from './middleware/error.js';
 
 export const createApp = () => {
   const app = express();
 
+  // req.ip drives the auth rate limiters. Behind a proxy every request
+  // otherwise appears to come from the proxy's address, collapsing all users
+  // into one bucket; exposed directly, blindly trusting X-Forwarded-For would
+  // let a client spoof it and sidestep the limits. So trust exactly as many
+  // hops as the deployment actually has (TRUST_PROXY), and none by default.
+  app.set('trust proxy', config.trustProxy);
+  app.disable('x-powered-by');
+
   app.use(helmet());
-  app.use(cors());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true })); // Click webhooks post form data
-  app.use(morgan('dev'));
+  app.use(
+    cors({
+      // Wide open by default (dev); pin to an allowlist in production via
+      // CORS_ORIGINS so a hostile page cannot drive the API from a browser.
+      origin: config.corsOrigins.length ? config.corsOrigins : true,
+      credentials: false,
+    })
+  );
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100kb' })); // Click webhooks post form data
+  // 'dev' is colourised and lossy; production wants a parseable access log.
+  app.use(morgan(config.env === 'production' ? 'combined' : 'dev'));
+
+  // Blanket ceiling so no single client can saturate the API; the tight,
+  // targeted limits live on the auth routes.
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 300,
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: (req) => req.path === '/health', // health checks are never throttled
+    })
+  );
 
   // basic rate limit on auth to slow brute-force
-  const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50 });
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
   app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
@@ -39,6 +75,7 @@ export const createApp = () => {
   // /api/admin/* request returned 403 before ever reaching adminRoutes.
   app.use('/api/shop', salesRoutes);  // /api/shop/dashboard, daily-sales, staff
   app.use('/api/admin', adminRoutes); // Super Admin panel API
+  app.use('/api/config', configRoutes);
   app.use('/api', debtRoutes);        // /api/debtors, /api/debts (broadest, so last)
   app.use('/', paymentRoutes);        // /pay/:token, /webhooks/click/*
 

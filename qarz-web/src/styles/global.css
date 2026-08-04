@@ -40,6 +40,30 @@
   --sidebar-w: 232px;
 }
 
+:root[data-theme="dark"] {
+  --paper: #12151a;
+  --surface: #1a1e26;
+  --line: #2d3340;
+  --line-strong: #3f4758;
+  --ink: #e8e8ec;
+  --ink-2: #a0a7b4;
+  --ink-3: #6e7685;
+
+  --accent: #5865f2;
+  --accent-hover: #4752c4;
+  --accent-soft: #1e2448;
+
+  --ok: #2ecc71;
+  --ok-soft: #163624;
+  --warn: #f39c12;
+  --warn-soft: #3b2a10;
+  --danger: #e74c3c;
+  --danger-soft: #3d1c1a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root { height: 100%; }

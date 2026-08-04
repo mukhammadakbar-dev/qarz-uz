@@ -8,9 +8,18 @@ export const computeStatus = (amount, paid, dueDate) => {
   const a = Number(amount);
   const p = Number(paid);
   if (p >= a) return 'paid';
-  const overdue = dueDate && new Date(dueDate) < new Date(new Date().toDateString());
+  // A debt is overdue once its due DATE is behind us — compare calendar days,
+  // not instants, so a debt due today never flips to overdue mid-afternoon.
+  // (The previous `new Date(new Date().toDateString())` round-trip relied on
+  // parsing an implementation-defined date string.)
+  const overdue = Boolean(dueDate) && startOfDay(dueDate) < startOfDay(new Date());
   if (p > 0) return overdue ? 'overdue' : 'partial';
   return overdue ? 'overdue' : 'open';
+};
+
+const startOfDay = (value) => {
+  const d = new Date(value);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
 
 /**
@@ -48,6 +57,8 @@ export const createDebt = async ({ debtorId, shopId, direction, amount, note, du
  */
 export const recordPayment = async ({ debtId, amount, method, transactionId }) => {
   return withTransaction(async (client) => {
+    // FOR UPDATE serialises concurrent payments against the same debt, so the
+    // read-modify-write of paid_amount below can't lose an update.
     const { rows } = await client.query('SELECT * FROM debts WHERE id = $1 FOR UPDATE', [debtId]);
     const debt = rows[0];
     if (!debt) throw NotFound('Qarz topilmadi');
@@ -58,11 +69,20 @@ export const recordPayment = async ({ debtId, amount, method, transactionId }) =
       throw new AppError('To\'lov summasi qarzdan oshib ketdi', 422, 'OVERPAY');
     }
 
-    await client.query(
-      `INSERT INTO payments (debt_id, amount, method, transaction_id)
-       VALUES ($1,$2,$3,$4)`,
-      [debtId, amount, method || 'manual', transactionId || null]
-    );
+    // uq_payments_txn (migration 004) rejects a repeat of the same gateway
+    // transaction; surface it as an explicit conflict rather than a 500.
+    try {
+      await client.query(
+        `INSERT INTO payments (debt_id, amount, method, transaction_id)
+         VALUES ($1,$2,$3,$4)`,
+        [debtId, amount, method || 'manual', transactionId || null]
+      );
+    } catch (err) {
+      if (err.code === '23505') {
+        throw new AppError('Bu to\'lov allaqachon qayd etilgan', 409, 'DUPLICATE_PAYMENT');
+      }
+      throw err;
+    }
 
     const status = computeStatus(debt.amount, newPaid, debt.due_date);
     const upd = await client.query(

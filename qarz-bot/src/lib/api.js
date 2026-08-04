@@ -30,13 +30,16 @@ const rawFetch = async (path, { method = 'GET', body, token, botSecret = false }
   // registration OTP (a shared Telegram contact already proves phone ownership).
   if (botSecret && config.botSharedSecret) headers['x-bot-secret'] = config.botSharedSecret;
 
+  // fetch() throws a TypeError outright if a GET/HEAD carries a body, so build
+  // the init object without the key rather than passing `undefined`.
+  const init = { method, headers };
+  if (body !== undefined && method !== 'GET' && method !== 'HEAD') {
+    init.body = JSON.stringify(body);
+  }
+
   let res;
   try {
-    res = await fetch(`${config.apiBaseUrl}${path}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    res = await fetch(`${config.apiBaseUrl}${path}`, init);
   } catch (err) {
     throw new ApiError(`Server bilan aloqa yo'q: ${err.message}`, 0, 'NETWORK');
   }
@@ -119,11 +122,34 @@ export const api = {
       body: { phone, telegramId, otp },
     }),
 
-  registerPersonal: (phone, password, fullName) =>
+  // `phone` comes from a shared contact card, which is what actually proves
+  // ownership; the backend rejects the call without the bot shared secret.
+  confirmVerifyToken: (token, telegramId, phone) =>
+    publicRequest('/api/auth/telegram/confirm-verify-token', {
+      method: 'POST',
+      body: { token, telegramId, phone },
+      botSecret: true,
+    }),
+
+  directLinkByContact: (phone, telegramId) =>
+    publicRequest('/api/auth/telegram/direct-link', {
+      method: 'POST',
+      body: { phone, telegramId },
+      botSecret: true,
+    }),
+
+  registerShop: (phone, password, fullName, shopName, telegramId) =>
+    publicRequest('/api/auth/register/shop', {
+      method: 'POST',
+      body: { phone, password, fullName, shopName, telegramId },
+      botSecret: true,
+    }),
+
+  registerPersonal: (phone, password, fullName, telegramId) =>
     publicRequest('/api/auth/register/personal', {
       method: 'POST',
-      body: { phone, password, fullName },
-      botSecret: true, // contact already shared in Telegram: no extra OTP needed
+      body: { phone, password, fullName, telegramId },
+      botSecret: true,
     }),
 
   // --- Debtors ---
@@ -144,6 +170,17 @@ export const api = {
   // --- Debts ---
   addDebt: (tgId, payload) =>
     authRequest(tgId, '/api/debts', { method: 'POST', body: payload }),
+
+  getDebtReceiptBuffer: async (tgId, debtId) => {
+    const sess = sessions.get(tgId);
+    if (!sess?.accessToken) throw new SessionExpiredError();
+    const res = await fetch(`${config.apiBaseUrl}/api/debts/${debtId}/receipt`, {
+      headers: { Authorization: `Bearer ${sess.accessToken}` }
+    });
+    if (!res.ok) throw new ApiError('Kvitansiyani yuklashda xatolik', res.status);
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  },
 
   payDebt: (tgId, debtId, payload) =>
     authRequest(tgId, `/api/debts/${debtId}/payments`, { method: 'POST', body: payload }),

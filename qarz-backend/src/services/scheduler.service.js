@@ -86,9 +86,61 @@ export const runReminderSweep = async () => {
 };
 
 /**
+ * Roll each shop's monthly SMS allowance over into a new period.
+ *
+ * sms_balance carries monthly_limit and period_start, and plans are sold as
+ * "N SMS per month", but nothing ever reset `remaining`. A shop that used its
+ * 30 free messages simply stopped being able to send reminders — permanently.
+ *
+ * Purchased extra_package credits do not expire, so they are left untouched.
+ */
+export const resetMonthlySmsBalances = async () => {
+  const { rowCount } = await query(
+    `UPDATE sms_balance
+     SET remaining    = monthly_limit,
+         period_start = date_trunc('month', CURRENT_DATE)::date,
+         updated_at   = now()
+     WHERE period_start < date_trunc('month', CURRENT_DATE)::date`
+  );
+  if (rowCount) console.log(`[cron] SMS balances reset for ${rowCount} shop(s)`);
+  return rowCount;
+};
+
+/**
+ * Guards against two failure modes of the raw cron callback:
+ *
+ *  - node-cron does not await or catch the returned promise, so any rejection
+ *    (a dropped DB connection during the initial query, say) became an
+ *    unhandled rejection — fatal by default on modern Node.
+ *  - a sweep that outruns its schedule would otherwise start again on top of
+ *    itself and send every reminder twice.
+ */
+let sweepRunning = false;
+
+const runSweepGuarded = async () => {
+  if (sweepRunning) {
+    console.warn('[cron] Previous sweep still running, skipping this tick');
+    return;
+  }
+  sweepRunning = true;
+  try {
+    // Roll balances over first, so a shop entering a new month can actually
+    // send the reminders this sweep is about to queue.
+    await resetMonthlySmsBalances();
+    await runReminderSweep();
+  } catch (err) {
+    console.error('[cron] Reminder sweep failed:', err);
+  } finally {
+    sweepRunning = false;
+  }
+};
+
+/**
  * Schedule the sweep daily at 09:00 (Asia/Tashkent).
+ * Returns the task so callers (e.g. graceful shutdown) can stop it.
  */
 export const startScheduler = () => {
-  cron.schedule('0 9 * * *', runReminderSweep, { timezone: 'Asia/Tashkent' });
+  const task = cron.schedule('0 9 * * *', runSweepGuarded, { timezone: 'Asia/Tashkent' });
   console.log('[cron] Reminder scheduler started (daily 09:00 Asia/Tashkent)');
+  return task;
 };

@@ -4,12 +4,14 @@ import { ThemeProvider } from './lib/theme.jsx';
 import { ToastProvider } from './components/Toast.jsx';
 import Layout from './components/Layout.jsx';
 import SuperAdminLayout from './components/SuperAdminLayout.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Debtors from './pages/Debtors.jsx';
 import Sales from './pages/Sales.jsx';
 import Staff from './pages/Staff.jsx';
 import SuperAdminShops from './pages/SuperAdminShops.jsx';
+import SuperAdminStats from './pages/SuperAdminStats.jsx';
 import SuperAdminPlans from './pages/SuperAdminPlans.jsx';
 import SuperAdminAuditLog from './pages/SuperAdminAuditLog.jsx';
 
@@ -78,22 +80,25 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <ToastProvider>
-            <Routes>
-              <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+          <ErrorBoundary>
+            <ToastProvider>
+              <Routes>
+                <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
 
-              <Route path="/" element={<HomeRoute />} />
-              <Route path="/debtors" element={<Protected><Debtors /></Protected>} />
-              <Route path="/sales" element={<ShopOnly><Sales /></ShopOnly>} />
-              <Route path="/staff" element={<OwnerOnly><Staff /></OwnerOnly>} />
+                <Route path="/" element={<HomeRoute />} />
+                <Route path="/debtors" element={<Protected><Debtors /></Protected>} />
+                <Route path="/sales" element={<ShopOnly><Sales /></ShopOnly>} />
+                <Route path="/staff" element={<OwnerOnly><Staff /></OwnerOnly>} />
 
-              <Route path="/super-admin" element={<SuperAdminProtected><SuperAdminShops /></SuperAdminProtected>} />
-              <Route path="/super-admin/plans" element={<SuperAdminProtected><SuperAdminPlans /></SuperAdminProtected>} />
-              <Route path="/super-admin/audit-log" element={<SuperAdminProtected><SuperAdminAuditLog /></SuperAdminProtected>} />
+                <Route path="/super-admin" element={<SuperAdminProtected><SuperAdminShops /></SuperAdminProtected>} />
+                <Route path="/super-admin/stats" element={<SuperAdminProtected><SuperAdminStats /></SuperAdminProtected>} />
+                <Route path="/super-admin/plans" element={<SuperAdminProtected><SuperAdminPlans /></SuperAdminProtected>} />
+                <Route path="/super-admin/audit-log" element={<SuperAdminProtected><SuperAdminAuditLog /></SuperAdminProtected>} />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </ToastProvider>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </ToastProvider>
+          </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -75,5 +75,7 @@ export async function linkOtpConversation(conversation, ctx) {
   }
 
   sessions.set(tgId, { pendingPhone: undefined });
-  await ctx.reply(t('otp_cancelled', lang));
+  await ctx.reply(
+    "Agar SMS kelmagan bo'lsa, ehtimol bu raqam hali ro'yxatdan o'tmagan. Ro'yxatdan o'tish uchun /register buyrug'ini yuboring yoki avval veb-saytda ro'yxatdan o'ting."
+  );
 }

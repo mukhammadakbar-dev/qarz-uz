@@ -3,8 +3,7 @@ import { createServer } from 'http';
 
 // stub pg before app import
 const { default: pgMod } = await import('pg');
-const rowsFor = { };
-pgMod.Pool.prototype.query = async function(text, params) {
+pgMod.Pool.prototype.query = async function(text) {
   const t = String(text);
   if (t.includes('FROM users WHERE phone')) return { rows: [] }; // no such user
   if (t.includes('INSERT INTO otp_codes')) return { rows: [{}] };

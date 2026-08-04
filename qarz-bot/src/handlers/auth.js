@@ -8,8 +8,30 @@ import { contactKeyboard, mainMenu } from '../keyboards/index.js';
  */
 export const handleStart = async (ctx) => {
   const tgId = ctx.from.id;
+  const match = ctx.match || '';
+
   const sess = sessions.get(tgId);
   const lang = sess?.lang || 'uz';
+
+  // Deep-link registration verification (/start verify_<token>).
+  //
+  // The token alone proves nothing — whoever started the registration holds it,
+  // and that may not be the owner of the phone number. So we ask for a contact
+  // card here and let the backend check it against the number the registration
+  // was started for; only Telegram can vouch for that number.
+  if (typeof match === 'string' && match.startsWith('verify_')) {
+    const token = match.slice('verify_'.length);
+    if (!/^[a-f0-9]{64}$/.test(token)) {
+      await ctx.reply(t('verify_err_msg', lang, { msg: 'token yaroqsiz' }));
+      return;
+    }
+    sessions.set(tgId, { lang, pendingVerifyToken: token });
+    await ctx.reply(t('verify_ask_contact', lang), {
+      parse_mode: 'HTML',
+      reply_markup: contactKeyboard(lang),
+    });
+    return;
+  }
 
   if (sessions.isAuthed(tgId)) {
     await ctx.reply(t('menu_title', lang), {
@@ -48,13 +70,39 @@ export const handleContact = async (ctx) => {
     ? contact.phone_number
     : '+' + contact.phone_number;
 
-  sessions.set(tgId, { pendingPhone: phone });
+  // A web registration is waiting on this contact to prove the number is ours.
+  if (sess.pendingVerifyToken) {
+    const token = sess.pendingVerifyToken;
+    sessions.set(tgId, { pendingVerifyToken: undefined });
+    try {
+      await api.confirmVerifyToken(token, tgId, phone);
+      await ctx.reply(t('verify_ok_msg', lang), { parse_mode: 'HTML' });
+    } catch (err) {
+      await ctx.reply(t('verify_err_msg', lang, { msg: err.message }));
+    }
+    return;
+  }
 
   try {
-    // Always returns {sent:true} — the backend deliberately does not reveal
-    // whether an account exists, so we cannot branch on it here.
-    await api.requestTelegramLink(phone);
-    await ctx.conversation.enter('linkOtp');
+    const res = await api.directLinkByContact(phone, tgId);
+    if (res.exists) {
+      const role = res.user?.role || 'personal';
+      sessions.set(tgId, {
+        accessToken: res.tokens?.accessToken,
+        refreshToken: res.tokens?.refreshToken,
+        role,
+        phone,
+      });
+
+      await ctx.reply(`✅ <b>Hush kelibsiz! Akkauntingiz muvaffaqiyatli bog'landi.</b>`, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu(lang, role),
+      });
+    } else {
+      // New user: store pendingPhone and trigger interactive onboarding
+      sessions.set(tgId, { pendingPhone: phone, lang });
+      await ctx.conversation.enter('register');
+    }
   } catch (err) {
     await ctx.reply(t('error_generic', lang, { msg: err.message }));
   }

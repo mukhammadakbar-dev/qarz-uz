@@ -1,4 +1,4 @@
-import { InlineKeyboard } from 'grammy';
+import { InputFile, InlineKeyboard } from 'grammy';
 import { t, money } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { sessions } from '../lib/sessions.js';
@@ -32,42 +32,90 @@ export async function addDebtConversation(conversation, ctx) {
     }
   };
 
-  // 1) Debtor name
-  await ctx.reply(t('ask_debtor_name', lang), { reply_markup: cancelKeyboard(lang) });
-  let msg = await conversation.waitFor('message:text');
-  if (isCancel(msg.message.text, lang)) return endCancelled(ctx, lang, sess);
-  const fullName = msg.message.text.trim();
+  // 0) Initial Choice: New Debtor vs Select Existing
+  const initialKb = new InlineKeyboard()
+    .text(t('btn_new_debtor', lang), 'mode:new')
+    .text(t('btn_select_existing', lang), 'mode:existing');
 
-  // 2) Look for an existing debtor with a similar name
+  await ctx.reply(t('ask_mode', lang), { reply_markup: initialKb });
+  const choiceCq = await conversation.waitFor('callback_query:data');
+  await choiceCq.answerCallbackQuery();
+  const choiceMode = choiceCq.callbackQuery.data.split(':')[1];
+
   let debtorId = null;
-  let matches = [];
-  try {
-    matches = await conversation.external(() =>
-      api.listDebtors(tgId, { search: fullName })
-    );
-  } catch (err) {
-    if (err?.code === 'SESSION_EXPIRED') return fail(err);
-    matches = []; // search is best-effort; fall through to creating a new debtor
+  let fullName = '';
+  // Declared once at function scope: the amount/due/note steps below assign to
+  // `msg`, and the only previous declarations were `let msg` inside the
+  // `if (!debtorId)` blocks. In an ES module (always strict mode) that made
+  // every assignment past step 3 a ReferenceError, so the flow crashed at
+  // "Summani kiriting" every single time.
+  let msg;
+
+  if (choiceMode === 'existing') {
+    let existingList = [];
+    try {
+      existingList = await conversation.external(() =>
+        api.listDebtors(tgId, { filter: 'all' })
+      );
+    } catch (err) {
+      if (err?.code === 'SESSION_EXPIRED') return fail(err);
+    }
+
+    if (Array.isArray(existingList) && existingList.length > 0) {
+      const kb = new InlineKeyboard();
+      existingList.slice(0, 8).forEach((m) => {
+        kb.text(`${m.full_name} (${money(m.outstanding || 0)})`, `pick:${m.id}`).row();
+      });
+      await ctx.reply(t('ask_select_debtor', lang), { reply_markup: kb });
+      const pickCq = await conversation.waitFor('callback_query:data');
+      await pickCq.answerCallbackQuery();
+      debtorId = pickCq.callbackQuery.data.split(':')[1];
+      const selected = existingList.find((x) => x.id === debtorId);
+      fullName = selected?.full_name || 'Mijoz';
+    } else {
+      await ctx.reply(t('debtors_not_found_new', lang));
+    }
   }
 
-  if (Array.isArray(matches) && matches.length > 0) {
-    const kb = new InlineKeyboard();
-    matches.slice(0, 5).forEach((m, i) => {
-      const label = t('dup_option', lang, {
-        name: m.full_name,
-        phone: m.phone ? ` (${m.phone})` : '',
-        outstanding: money(m.outstanding || 0),
-      });
-      kb.text(label, `pick:${m.id}`).row();
-      if (i === matches.length - 1) kb.row();
-    });
-    kb.text(t('dup_new_btn', lang), 'pick:new');
+  // 1) If creating a new debtor or fallback
+  if (!debtorId) {
+    await ctx.reply(t('ask_debtor_name', lang), { reply_markup: cancelKeyboard(lang) });
+    msg = await conversation.waitFor('message:text');
+    if (isCancel(msg.message.text, lang)) return endCancelled(ctx, lang, sess);
+    fullName = msg.message.text.trim();
+  }
 
-    await ctx.reply(t('dup_found', lang), { reply_markup: kb });
-    const cq = await conversation.waitFor('callback_query:data');
-    await cq.answerCallbackQuery();
-    const choice = cq.callbackQuery.data.split(':')[1];
-    if (choice !== 'new') debtorId = choice;
+  // 2) Look for an existing debtor with a similar name if creating new
+  if (!debtorId) {
+    let matches = [];
+    try {
+      matches = await conversation.external(() =>
+        api.listDebtors(tgId, { search: fullName })
+      );
+    } catch (err) {
+      if (err?.code === 'SESSION_EXPIRED') return fail(err);
+      matches = []; // search is best-effort; fall through to creating a new debtor
+    }
+
+    if (Array.isArray(matches) && matches.length > 0) {
+      const kb = new InlineKeyboard();
+      matches.slice(0, 5).forEach((m, i) => {
+        const label = t('dup_option', lang, {
+          name: m.full_name,
+          phone: m.phone ? ` (${m.phone})` : '',
+          outstanding: money(m.outstanding || 0),
+        });
+        kb.text(label, `pick:${m.id}`).row();
+        if (i === matches.length - 1) kb.row();
+      });
+      kb.text(t('dup_new_btn', lang), 'pick:new');
+
+      await ctx.reply(t('dup_found', lang), { reply_markup: kb });
+      const cq = await conversation.waitFor('callback_query:data');
+      await cq.answerCallbackQuery();
+      const choice = cq.callbackQuery.data.split(':')[1];
+      if (choice !== 'new') debtorId = choice;
+    }
   }
 
   // 3) Phone — only needed when creating a new debtor
@@ -131,17 +179,44 @@ export async function addDebtConversation(conversation, ctx) {
       );
       debtorId = debtor.id;
     }
-    await conversation.external(() =>
+    const debt = await conversation.external(() =>
       api.addDebt(tgId, { debtorId, direction, amount, dueDate, note })
     );
-    await ctx.reply(
-      t('debt_created', lang, {
-        name: fullName,
-        amount: money(amount),
-        due: dueDate || '—',
-      }),
-      { parse_mode: 'HTML', reply_markup: mainMenu(lang, sess.role) }
-    );
+
+    // Try fetching PNG receipt image
+    let receiptPng;
+    try {
+      receiptPng = await conversation.external(() =>
+        api.getDebtReceiptBuffer(tgId, debt.id)
+      );
+    } catch {
+      receiptPng = null;
+    }
+
+    const kb = new InlineKeyboard()
+      .text('📲 Mijozga yuborish', `send_receipt:${debt.id}:${debtorId}`)
+      .text('💳 To\'lov linki', `pay_link:${debt.id}`);
+
+    const captionText = t('debt_created', lang, {
+      name: fullName,
+      amount: money(amount),
+      due: dueDate || '—',
+    });
+
+    if (receiptPng) {
+      await ctx.replyWithPhoto(new InputFile(receiptPng, `kvitansiya-${debt.id}.png`), {
+        caption: captionText,
+        parse_mode: 'HTML',
+        reply_markup: kb,
+      });
+      // Also restore main menu keyboard for main chat
+      await ctx.reply('Bosh menyu:', { reply_markup: mainMenu(lang, sess.role) });
+    } else {
+      await ctx.reply(captionText, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenu(lang, sess.role),
+      });
+    }
   } catch (err) {
     await fail(err);
   }

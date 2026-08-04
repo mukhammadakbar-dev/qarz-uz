@@ -10,14 +10,14 @@ const { default: pgMod } = await import('pg');
 const db = {
   debtors: [
     // shop A's debtor, no open debts -> archivable
-    { id: 'debtor-1', shop_id: 'shop-A', owner_id: null, full_name: 'Akmal Yusupov', phone: '+998901234567', telegram_id: null, is_archived: false },
+    { id: '11111111-1111-4111-8111-111111111111', shop_id: 'shop-A', owner_id: null, full_name: 'Akmal Yusupov', phone: '+998901234567', telegram_id: null, is_archived: false },
     // shop A's debtor, has an open debt -> must be refused
-    { id: 'debtor-2', shop_id: 'shop-A', owner_id: null, full_name: 'Dilnoza Karimova', phone: '+998935556677', telegram_id: null, is_archived: false },
+    { id: '22222222-2222-4222-8222-222222222222', shop_id: 'shop-A', owner_id: null, full_name: 'Dilnoza Karimova', phone: '+998935556677', telegram_id: null, is_archived: false },
     // shop B's debtor -> must be invisible to shop A's owner
-    { id: 'debtor-3', shop_id: 'shop-B', owner_id: null, full_name: 'Boshqa Dokon Mijozi', phone: '+998977778899', telegram_id: null, is_archived: false },
+    { id: '33333333-3333-4333-8333-333333333333', shop_id: 'shop-B', owner_id: null, full_name: 'Boshqa Dokon Mijozi', phone: '+998977778899', telegram_id: null, is_archived: false },
   ],
   debts: [
-    { id: 'debt-1', debtor_id: 'debtor-2', amount: 100000, paid_amount: 0, status: 'open' },
+    { id: 'debt-1', debtor_id: '22222222-2222-4222-8222-222222222222', amount: 100000, paid_amount: 0, status: 'open' },
   ],
 };
 
@@ -25,8 +25,8 @@ pgMod.Pool.prototype.query = async function (text, params = []) {
   const t = String(text).replace(/\s+/g, ' ').trim();
 
   // authenticate() middleware loads the user
-  if (t.startsWith('SELECT id, role, is_active, parent_shop_id FROM users')) {
-    return { rows: [{ id: 'owner-A', role: 'shop_owner', is_active: true, parent_shop_id: null }] };
+  if (t.includes('FROM users u') && t.includes('LEFT JOIN shops')) {
+    return { rows: [{ id: 'owner-A', role: 'shop_owner', is_active: true, parent_shop_id: null, owned_shop_id: 'shop-A' }] };
   }
   if (t.startsWith('SELECT id FROM shops WHERE owner_id')) {
     return { rows: [{ id: 'shop-A' }] };
@@ -61,10 +61,6 @@ pgMod.Pool.prototype.query = async function (text, params = []) {
   if (t.startsWith('UPDATE debtors SET') && !t.includes('is_archived')) {
     const d = db.debtors.find((x) => x.id === params[0]);
     if (!d) return { rows: [] };
-    // crude but sufficient: params order matches [id, scopeValue, ...fields]
-    if (t.includes('full_name')) {
-      const idx = params.length - (t.includes('telegram_id') ? 2 : 1) - (t.includes('phone') ? 1 : 0);
-    }
     // Just reflect whatever the test asserts on via full_name param directly
     if (params[2] !== undefined) d.full_name = params[2];
     return { rows: [d] };
@@ -100,41 +96,41 @@ const P = (n, c, extra = '') => console.log((c ? 'PASS' : 'FAIL') + ' ' + n + (e
 console.log('--- #3 archive / delete debtor ---');
 
 // 1. Debtor with NO open debts can be archived
-let r = await call('/api/debtors/debtor-1', { method: 'DELETE' });
+let r = await call('/api/debtors/11111111-1111-4111-8111-111111111111', { method: 'DELETE' });
 P('archivable debtor -> 200', r.status === 200, `got ${r.status} ${JSON.stringify(r.body)}`);
 P('response marks archived', r.body.archived === true);
-P('debtor actually flagged archived in store', db.debtors.find((d) => d.id === 'debtor-1').is_archived === true);
+P('debtor actually flagged archived in store', db.debtors.find((d) => d.id === '11111111-1111-4111-8111-111111111111').is_archived === true);
 
 // 2. Debtor WITH an open debt must be refused — the case the task called out explicitly
-r = await call('/api/debtors/debtor-2', { method: 'DELETE' });
+r = await call('/api/debtors/22222222-2222-4222-8222-222222222222', { method: 'DELETE' });
 P('debtor with open debt -> 409 HAS_OPEN_DEBTS', r.status === 409 && r.body?.error?.code === 'HAS_OPEN_DEBTS', `got ${r.status} ${r.body?.error?.code}`);
-P('debtor-2 NOT archived after refusal', db.debtors.find((d) => d.id === 'debtor-2').is_archived === false);
+P('22222222-2222-4222-8222-222222222222 NOT archived after refusal', db.debtors.find((d) => d.id === '22222222-2222-4222-8222-222222222222').is_archived === false);
 P('error message mentions the debt', /qarz/i.test(r.body?.error?.message || ''));
 
 // 3. Tenant scoping: shop A's owner cannot touch shop B's debtor
-r = await call('/api/debtors/debtor-3', { method: 'DELETE' });
+r = await call('/api/debtors/33333333-3333-4333-8333-333333333333', { method: 'DELETE' });
 P('other shop\'s debtor -> 404 (not found, not leaked)', r.status === 404, `got ${r.status}`);
-P('debtor-3 untouched', db.debtors.find((d) => d.id === 'debtor-3').is_archived === false);
+P('33333333-3333-4333-8333-333333333333 untouched', db.debtors.find((d) => d.id === '33333333-3333-4333-8333-333333333333').is_archived === false);
 
 // 4. Unknown id -> 404
-r = await call('/api/debtors/does-not-exist', { method: 'DELETE' });
+r = await call('/api/debtors/99999999-9999-4999-8999-999999999999', { method: 'DELETE' });
 P('unknown debtor id -> 404', r.status === 404, `got ${r.status}`);
 
 console.log('\n--- PATCH /api/debtors/:id ---');
 
 // 5. Update own debtor's name
-r = await call('/api/debtors/debtor-1', { method: 'PATCH', body: { fullName: 'Akmal Yangi' } });
+r = await call('/api/debtors/11111111-1111-4111-8111-111111111111', { method: 'PATCH', body: { fullName: 'Akmal Yangi' } });
 P('update own debtor -> 200', r.status === 200, `got ${r.status} ${JSON.stringify(r.body)}`);
 
 // 6. Cannot update another shop's debtor
-r = await call('/api/debtors/debtor-3', { method: 'PATCH', body: { fullName: 'Hack Attempt' } });
+r = await call('/api/debtors/33333333-3333-4333-8333-333333333333', { method: 'PATCH', body: { fullName: 'Hack Attempt' } });
 P('update other shop\'s debtor -> 404', r.status === 404, `got ${r.status}`);
-P('debtor-3 name unchanged', db.debtors.find((d) => d.id === 'debtor-3').full_name === 'Boshqa Dokon Mijozi');
+P('33333333-3333-4333-8333-333333333333 name unchanged', db.debtors.find((d) => d.id === '33333333-3333-4333-8333-333333333333').full_name === 'Boshqa Dokon Mijozi');
 
 // 7. No auth -> 401 for both verbs
-const noAuth = await fetch(base + '/api/debtors/debtor-1', { method: 'DELETE' });
+const noAuth = await fetch(base + '/api/debtors/11111111-1111-4111-8111-111111111111', { method: 'DELETE' });
 P('DELETE without auth -> 401', noAuth.status === 401, `got ${noAuth.status}`);
-const noAuth2 = await fetch(base + '/api/debtors/debtor-1', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+const noAuth2 = await fetch(base + '/api/debtors/11111111-1111-4111-8111-111111111111', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
 P('PATCH without auth -> 401', noAuth2.status === 401, `got ${noAuth2.status}`);
 
 server.close();

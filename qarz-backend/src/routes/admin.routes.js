@@ -20,8 +20,18 @@ router.use(authenticate, authorize('super_admin'));
 router.get('/shops', validate(adminSchemas.listShops, 'query'), listShops);
 router.get('/stats', platformStats);
 router.get('/plans', listPlans);
-router.patch('/plans/:code', validate(adminSchemas.updatePlan), updatePlan);
-router.patch('/shops/:shopId/active', validate(adminSchemas.setShopActive), setShopActive);
+router.patch(
+  '/plans/:code',
+  validate(adminSchemas.planCodeParam, 'params'),
+  validate(adminSchemas.updatePlan),
+  updatePlan
+);
+router.patch(
+  '/shops/:shopId/active',
+  validate(adminSchemas.shopIdParam, 'params'),
+  validate(adminSchemas.setShopActive),
+  setShopActive
+);
 router.get('/audit-log', auditLog);
 router.post('/broadcast', validate(adminSchemas.broadcast), broadcast);
 

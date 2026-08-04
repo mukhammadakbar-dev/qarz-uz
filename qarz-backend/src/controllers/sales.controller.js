@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { asyncHandler } from '../utils/errors.js';
 import { query } from '../db/pool.js';
+import { isoDate } from '../utils/validators.js';
 
 export const salesSchemas = {
   upsert: z.object({
-    saleDate: z.string().optional(), // YYYY-MM-DD, defaults today
-    cashCard: z.number().nonnegative(),
+    saleDate: isoDate.optional(), // defaults to today
+    cashCard: z.number().nonnegative().finite(),
   }),
   range: z.object({
-    from: z.string().optional(),
-    to: z.string().optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
   }),
 };
 

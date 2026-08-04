@@ -57,10 +57,23 @@ export const resolvePaymentLink = async (token) => {
  * Click signs with md5 of a concatenation of params + secret key.
  */
 export const verifyClickSignature = (params) => {
+  // Fail closed. With no secret configured the md5 below is computed over
+  // entirely public values, so anyone could compute a matching sign_string and
+  // have arbitrary debts marked as paid. An unconfigured integration must
+  // reject every callback, not accept every callback.
+  if (!config.click.secretKey) return false;
+
   const {
     click_trans_id, service_id, merchant_trans_id,
     merchant_prepare_id, amount, action, sign_time, sign_string,
   } = params;
+
+  if (typeof sign_string !== 'string' || sign_string.length === 0) return false;
+
+  // Reject callbacks aimed at a different merchant service outright.
+  if (config.click.serviceId && String(service_id) !== String(config.click.serviceId)) {
+    return false;
+  }
 
   // Complete step includes merchant_prepare_id, Prepare step does not
   const base =
@@ -68,5 +81,7 @@ export const verifyClickSignature = (params) => {
     `${merchant_prepare_id ?? ''}${amount}${action}${sign_time}`;
 
   const expected = crypto.createHash('md5').update(base).digest('hex');
-  return expected === sign_string;
+  const a = Buffer.from(expected, 'utf8');
+  const b = Buffer.from(sign_string.toLowerCase(), 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 };

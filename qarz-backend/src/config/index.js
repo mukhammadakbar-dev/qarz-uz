@@ -61,9 +61,31 @@ const required = (key, fallback) => {
   return val;
 };
 
+/** Comma-separated env list -> trimmed, non-empty array. */
+const list = (val) =>
+  String(val || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
+
+  /**
+   * Browser origins allowed to call the API. Empty = allow any origin, which is
+   * the convenient default for local development but must be pinned down in
+   * production (set CORS_ORIGINS).
+   */
+  corsOrigins: list(process.env.CORS_ORIGINS),
+
+  /**
+   * How many reverse proxies sit in front of the app. Needed for req.ip to be
+   * the real client rather than the proxy — the auth rate limits are keyed on
+   * it, so getting this wrong buckets every user together. Number, or `false`
+   * when the app is exposed directly.
+   */
+  trustProxy: process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : false,
 
   db: {
     host: required('DB_HOST', 'localhost'),
@@ -108,6 +130,8 @@ export const config = {
 
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    // used to build t.me deep links for the Telegram registration handshake
+    botUsername: (process.env.TELEGRAM_BOT_USERNAME || 'tDaftar_bot').replace(/^@/, ''),
   },
 
   /**

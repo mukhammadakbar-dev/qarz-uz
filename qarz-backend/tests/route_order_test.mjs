@@ -16,7 +16,7 @@ const { default: pgMod } = await import('pg');
 
 pgMod.Pool.prototype.query = async function (text, params = []) {
   const t = String(text).replace(/\s+/g, ' ').trim();
-  if (t.startsWith('SELECT id, role, is_active, parent_shop_id FROM users')) {
+  if (t.includes('FROM users u') && t.includes('LEFT JOIN shops')) {
     const id = params[0];
     if (id === 'sa1') return { rows: [{ id: 'sa1', role: 'super_admin', is_active: true, parent_shop_id: null }] };
     if (id === 'owner1') return { rows: [{ id: 'owner1', role: 'shop_owner', is_active: true, parent_shop_id: null }] };

@@ -12,6 +12,8 @@ import {
   handleLangMenu,
   handleLangCallback,
   handleHistoryCallback,
+  handlePayLinkCallback,
+  handleReceiptSendCallback,
 } from './handlers/menu.js';
 
 import { addDebtConversation } from './scenes/addDebt.js';
@@ -20,6 +22,7 @@ import { registerConversation } from './scenes/register.js';
 import { linkOtpConversation } from './scenes/linkOtp.js';
 
 const bot = new Bot(config.botToken);
+let webServer = null;
 
 // grammY conversations need a session (in-memory here; persistence via our own store)
 bot.use(session({ initial: () => ({}) }));
@@ -34,6 +37,10 @@ bot.command('start', handleStart);
 bot.command('register', (ctx) => ctx.conversation.enter('register'));
 bot.command('cancel', async (ctx) => {
   const lang = sessions.get(ctx.from.id)?.lang || 'uz';
+  // Leave any active conversation. Without this the command only printed
+  // "cancelled" while the conversation stayed active, so the user's next
+  // message was still swallowed by the flow they had just cancelled.
+  await ctx.conversation.exit();
   await ctx.reply(t('cancelled', lang));
 });
 bot.command('menu', handleStart);
@@ -44,19 +51,14 @@ bot.on('message:contact', handleContact);
 // ---- Callback queries ----
 bot.callbackQuery(/^lang:/, handleLangCallback);
 bot.callbackQuery(/^history:/, handleHistoryCallback);
+bot.callbackQuery(/^send_receipt:/, handleReceiptSendCallback);
+bot.callbackQuery(/^pay_link:/, handlePayLinkCallback);
 bot.callbackQuery(/^adddebt:/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.conversation.enter('addDebt');
 });
 
 // ---- Menu buttons (text in either language) ----
-const menuKeys = {
-  addDebt: ['menu_add_debt'],
-  debtors: ['menu_debtors'],
-  dashboard: ['menu_dashboard'],
-  dailySales: ['menu_daily_sales'],
-  lang: ['menu_lang'],
-};
 const matches = (text, key) =>
   ['uz', 'ru'].some((l) => t(key, l) === text);
 
@@ -94,26 +96,86 @@ const start = async () => {
     console.error('[bot] Cannot start: TELEGRAM_BOT_TOKEN is missing.');
     process.exit(1);
   }
-  await bot.api.setMyCommands([
-    { command: 'start', description: 'Botni ishga tushirish / Запуск' },
-    { command: 'menu', description: 'Asosiy menyu / Меню' },
-    { command: 'register', description: 'Ro\'yxatdan o\'tish / Регистрация' },
-    { command: 'cancel', description: 'Bekor qilish / Отмена' },
-  ]);
+  try {
+    await bot.api.setMyCommands([
+      { command: 'start', description: 'Botni ishga tushirish / Запуск' },
+      { command: 'menu', description: 'Asosiy menyu / Меню' },
+      { command: 'register', description: 'Ro\'yxatdan o\'tish / Регистрация' },
+      { command: 'cancel', description: 'Bekor qilish / Отмена' },
+    ]);
+  } catch (err) {
+    console.warn('[bot] setMyCommands muvaffaqiyatsiz (internet/Telegram vaqtincha ulanmadi):', err.message);
+  }
 
   if (config.useWebhook && config.webhookUrl) {
+    if (!config.webhookSecret) {
+      console.error(
+        '[bot] Cannot start: WEBHOOK_SECRET is required in webhook mode.\n' +
+          '[bot] The endpoint is public, so without a secret token anyone who\n' +
+          '[bot] finds the URL can POST forged updates and impersonate any user.\n' +
+          '[bot] Generate one with: openssl rand -hex 32'
+      );
+      process.exit(1);
+    }
+
     const { webhookCallback } = await import('grammy');
     const express = (await import('express')).default;
     const app = express();
     app.use(express.json());
-    app.use(webhookCallback(bot, 'express'));
-    app.listen(config.port, () => console.log(`[bot] Webhook server on :${config.port}`));
-    await bot.api.setWebhook(config.webhookUrl);
+
+    // grammY compares this against Telegram's X-Telegram-Bot-Api-Secret-Token
+    // header and drops anything that doesn't match.
+    app.post(
+      '/telegram/webhook',
+      webhookCallback(bot, 'express', { secretToken: config.webhookSecret })
+    );
+    app.get('/health', (_req, res) => res.json({ ok: true }));
+
+    webServer = app.listen(config.port, () =>
+      console.log(`[bot] Webhook server on :${config.port}`)
+    );
+    await bot.api.setWebhook(config.webhookUrl, { secret_token: config.webhookSecret });
     console.log('[bot] Webhook set:', config.webhookUrl);
   } else {
     console.log('[bot] Starting long polling...');
-    bot.start({ onStart: (i) => console.log(`[bot] @${i.username} running ✔`) });
+    // bot.start() only settles when polling stops, so it must not be awaited
+    // here — but its rejection still has to be handled, or a failure to reach
+    // Telegram becomes an unhandled rejection that kills the process silently.
+    bot
+      .start({ onStart: (i) => console.log(`[bot] @${i.username} running ✔`) })
+      .catch((err) => {
+        console.error('[bot] Polling stopped with an error:', err);
+        process.exit(1);
+      });
   }
 };
 
-start();
+// ---- Graceful shutdown ----
+// grammY needs to be told to stop so the in-flight long-poll is closed and any
+// update currently being handled finishes, instead of being cut mid-write.
+let shuttingDown = false;
+const stop = async (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n[bot] ${signal} received, stopping...`);
+  const force = setTimeout(() => process.exit(1), 10_000);
+  force.unref();
+  try {
+    await bot.stop();
+    webServer?.close();
+  } catch (err) {
+    console.error('[bot] Error during shutdown:', err);
+  }
+  process.exit(0);
+};
+process.once('SIGINT', () => stop('SIGINT'));
+process.once('SIGTERM', () => stop('SIGTERM'));
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[bot] Unhandled promise rejection:', reason);
+});
+
+start().catch((err) => {
+  console.error('[bot] Failed to start:', err);
+  process.exit(1);
+});

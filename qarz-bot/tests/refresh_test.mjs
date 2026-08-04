@@ -64,10 +64,9 @@ P('missing refreshToken -> SessionExpired', threw instanceof SessionExpired);
 
 // non-401 errors propagate untouched (not swallowed as auth issue)
 sessions.set(4,{accessToken:'A2',refreshToken:'R1'});
-const origFetch=rawFetch;
 threw=null;
 try{
-  await (async()=>{ const s=sessions.get(4);
+  await (async()=>{
     try{ throw new ApiError('server boom',500); }
     catch(e){ if(e.status!==401) throw e; } })();
 }catch(e){ threw=e; }

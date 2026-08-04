@@ -20,6 +20,11 @@ export const adminSchemas = {
     advancedStats: z.boolean().optional(),
   }),
   setShopActive: z.object({ active: z.boolean() }),
+  // Route params reach typed columns directly (sub_plan enum, uuid), so
+  // validate their shape here rather than letting the driver raise a data-type
+  // error deep in the query.
+  planCodeParam: z.object({ code: z.enum(['start', 'pro', 'business']) }),
+  shopIdParam: z.object({ shopId: z.string().uuid() }),
   broadcast: z.object({
     message: z.string().min(1, 'Xabar bo\'sh bo\'lmasligi kerak').max(1000, 'Xabar juda uzun'),
   }),
@@ -71,19 +76,23 @@ export const listShops = asyncHandler(async (req, res) => {
 });
 
 export const platformStats = asyncHandler(async (_req, res) => {
-  const shops = await query('SELECT COUNT(*) AS c FROM shops');
-  const activeSubs = await query(
-    `SELECT COUNT(*) AS c FROM subscriptions WHERE status IN ('active','trial') AND ends_at > now()`
-  );
-  const smsUsed = await query(
-    `SELECT COUNT(*) AS c FROM notifications WHERE channel = 'sms' AND status = 'sent'
-     AND created_at >= date_trunc('month', CURRENT_DATE)`
-  );
-  const revenue = await query(
-    `SELECT COALESCE(SUM(p.price_uzs),0) AS total
-     FROM subscriptions sub JOIN plans p ON p.code = sub.plan
-     WHERE sub.status = 'active'`
-  );
+  // Four independent aggregates: run them concurrently rather than paying four
+  // sequential round-trips on a page that is polled by the admin dashboard.
+  const [shops, activeSubs, smsUsed, revenue] = await Promise.all([
+    query('SELECT COUNT(*) AS c FROM shops'),
+    query(
+      `SELECT COUNT(*) AS c FROM subscriptions WHERE status IN ('active','trial') AND ends_at > now()`
+    ),
+    query(
+      `SELECT COUNT(*) AS c FROM notifications WHERE channel = 'sms' AND status = 'sent'
+       AND created_at >= date_trunc('month', CURRENT_DATE)`
+    ),
+    query(
+      `SELECT COALESCE(SUM(p.price_uzs),0) AS total
+       FROM subscriptions sub JOIN plans p ON p.code = sub.plan
+       WHERE sub.status = 'active'`
+    ),
+  ]);
   res.json({
     totalShops: Number(shops.rows[0].c),
     activeSubscriptions: Number(activeSubs.rows[0].c),
@@ -142,6 +151,12 @@ export const updatePlan = asyncHandler(async (req, res) => {
 
 export const setShopActive = asyncHandler(async (req, res) => {
   const { active } = req.body;
+
+  // An unknown shop id matched nothing and still answered {ok:true, updated:0},
+  // so a typo in the admin panel looked like a successful block.
+  const shop = await query('SELECT id FROM shops WHERE id = $1', [req.params.shopId]);
+  if (!shop.rows[0]) throw NotFound('Do\'kon topilmadi');
+
   // Block/unblock the owner *and* every staff member of that shop, otherwise
   // staff accounts keep working after the shop is blocked.
   const { rows } = await query(
@@ -185,8 +200,9 @@ export const broadcast = asyncHandler(async (req, res) => {
   let smsSent = 0;
   let failed = 0;
 
-  for (const owner of owners) {
-    const text = `\uD83D\uDCE2 Qarz.uz: ${message}`;
+  const text = `📢 TemirDaftar.uz: ${message}`;
+
+  const deliver = async (owner) => {
     let result;
     if (owner.telegram_id) {
       result = await sendTelegramMessage(owner.telegram_id, text);
@@ -198,7 +214,22 @@ export const broadcast = asyncHandler(async (req, res) => {
       result = { ok: false, error: 'no contact channel' };
     }
     if (!result.ok) failed++;
-  }
+  };
+
+  // Sending strictly one-at-a-time meant the request stayed open for
+  // owners x round-trip — minutes once the platform has a few hundred shops,
+  // which no gateway will hold. A bounded pool keeps wall time proportional to
+  // owners/CONCURRENCY while staying polite to Telegram and Eskiz.
+  const CONCURRENCY = 8;
+  const queue = [...owners];
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      let owner;
+      while ((owner = queue.shift()) !== undefined) {
+        await deliver(owner);
+      }
+    })
+  );
 
   await logAction(req.user.id, 'broadcast', {
     message,

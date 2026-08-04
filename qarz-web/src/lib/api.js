@@ -42,7 +42,13 @@ const raw = async (path, { method = 'GET', body, token, retry = true } = {}) => 
   }
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  // A proxy or gateway in front of the API can answer with HTML (502/504) or an
+  // empty body; parsing that blindly threw a raw SyntaxError at the call site
+  // instead of a handleable ApiError.
+  let data = {};
+  if (text) {
+    try { data = JSON.parse(text); } catch { data = {}; }
+  }
   if (!res.ok) {
     throw new ApiError(data?.error?.message || `HTTP ${res.status}`, res.status, data?.error?.code);
   }
@@ -69,8 +75,12 @@ export const api = {
   login: (phone, password) =>
     raw('/api/auth/login', { method: 'POST', body: { phone, password } }),
 
-  requestRegisterOtp: (phone) =>
-    raw('/api/auth/register/request-otp', { method: 'POST', body: { phone } }),
+  getSmsStatus: () => raw('/api/config/sms-status'),
+
+  requestRegisterOtp: (phone, channel = 'sms') =>
+    raw('/api/auth/register/request-otp', { method: 'POST', body: { phone, channel } }),
+
+  getVerifyStatus: (token) => raw(`/api/auth/verify-status/${token}`),
 
   registerShop: (payload) =>
     raw('/api/auth/register/shop', { method: 'POST', body: payload }),

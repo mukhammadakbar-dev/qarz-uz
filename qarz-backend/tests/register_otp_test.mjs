@@ -95,7 +95,7 @@ const P = (n, c, extra = '') => console.log((c ? 'PASS' : 'FAIL') + ' ' + n + (e
 // (only possible because we control the secret in tests).
 const crypto = await import('crypto');
 const { config } = await import('../src/config/index.js');
-const findCode = (phone, purpose) => {
+const findCode = (phone, _purpose) => {
   for (let i = 0; i < 1000000; i++) {
     const c = String(i).padStart(6, '0');
     const h = crypto.createHmac('sha256', config.jwt.paymentLinkSecret).update(`${phone}:${c}`).digest('hex');

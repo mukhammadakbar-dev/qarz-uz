@@ -41,8 +41,8 @@ export default function Layout({ children }) {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">Q</span>
-          <span className="brand-name">Qarz<span className="brand-dim">.uz</span></span>
+          <span className="brand-mark">T</span>
+          <span className="brand-name">TemirDaftar<span className="brand-dim">.uz</span></span>
         </div>
 
         <nav className="nav">

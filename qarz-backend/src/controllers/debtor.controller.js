@@ -20,7 +20,7 @@ const phoneField = z
   .trim()
   .min(7, 'Telefon raqami juda qisqa')
   .max(20, 'Telefon raqami juda uzun')
-  .regex(/^[\d\s()+\-]+$/, 'Telefon raqami faqat raqamlardan iborat bo\'lishi kerak');
+  .regex(/^[\d\s()+-]+$/, 'Telefon raqami faqat raqamlardan iborat bo\'lishi kerak');
 
 export const debtorSchemas = {
   create: z

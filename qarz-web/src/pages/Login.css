@@ -60,3 +60,19 @@
   display: block;
   margin: 12px auto 0;
 }
+
+/* Telegram verification handshake (step 2, channel = telegram) */
+.tg-verify {
+  text-align: center;
+  padding: 18px 8px;
+  line-height: 1.55;
+}
+.tg-verify .verify-ok {
+  color: var(--ok, #16a34a);
+  font-weight: 600;
+}
+.spinner-inline {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 8px;
+}

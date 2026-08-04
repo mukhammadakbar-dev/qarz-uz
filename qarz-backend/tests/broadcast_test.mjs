@@ -1,5 +1,15 @@
 // Verifies POST /api/admin/broadcast: reaches every active shop owner via
 // Telegram-then-SMS fallback, skips inactive owners, and records an audit entry.
+//
+// The credentials below are cleared BEFORE config/index.js is imported. The
+// developer's own .env is loaded by dotenv at import time, and with a real
+// TELEGRAM_BOT_TOKEN present the "dev mode" short-circuit in telegram.service
+// is skipped — so the test hit the live Telegram API with a fake chat id and
+// failed on any machine that had the bot configured.
+process.env.TELEGRAM_BOT_TOKEN = '';
+process.env.ESKIZ_EMAIL = '';
+process.env.ESKIZ_PASSWORD = '';
+
 import { createServer } from 'http';
 import jwt from 'jsonwebtoken';
 
@@ -14,7 +24,7 @@ const auditRows = [];
 
 pgMod.Pool.prototype.query = async function (text, params = []) {
   const t = String(text).replace(/\s+/g, ' ').trim();
-  if (t.startsWith('SELECT id, role, is_active, parent_shop_id FROM users')) {
+  if (t.includes('FROM users u') && t.includes('LEFT JOIN shops')) {
     const id = params[0];
     if (id === 'sa1') return { rows: [{ id: 'sa1', role: 'super_admin', is_active: true, parent_shop_id: null }] };
     if (id === 'x') return { rows: [{ id: 'x', role: 'shop_owner', is_active: true, parent_shop_id: null }] };
