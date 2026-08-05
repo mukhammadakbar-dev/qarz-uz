@@ -7,7 +7,6 @@ import './SuperAdminLayout.css';
 
 const nav = [
   { to: '/super-admin', label: "Do'konlar", end: true, icon: ShopIcon },
-  { to: '/super-admin/stats', label: 'Statistika', icon: ChartIcon },
   { to: '/super-admin/plans', label: 'Tariflar', icon: TagIcon },
   { to: '/super-admin/audit-log', label: 'Faoliyat jurnali', icon: LogIcon },
 ];
@@ -72,15 +71,6 @@ function ShopIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M3 9l1.5-5h15L21 9" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M4 9v11h16V9M9 20v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function ChartIcon() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <line x1="18" y1="20" x2="18" y2="10" strokeLinecap="round" />
-      <line x1="12" y1="20" x2="12" y2="4" strokeLinecap="round" />
-      <line x1="6" y1="20" x2="6" y2="14" strokeLinecap="round" />
     </svg>
   );
 }
