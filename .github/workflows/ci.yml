@@ -1,10 +1,13 @@
 name: CI
 
 on:
+  # Naming feature branches here means every new one is forgotten until someone
+  # notices CI never ran. main covers what is shipped; pull_request covers
+  # everything on its way there, without running twice for a branch with an
+  # open PR.
   push:
-    branches: [main, production-readiness]
-  pull_request:
     branches: [main]
+  pull_request:
 
 # A new push to the same branch makes the previous run's result irrelevant.
 concurrency:
