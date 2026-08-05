@@ -19,8 +19,28 @@ domen A-yozuvi serverga qaratilgan bo'lishi.
 
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose-plugin nginx certbot python3-certbot-nginx
+sudo apt install -y docker.io docker-compose-v2 docker-buildx nginx certbot python3-certbot-nginx
 sudo usermod -aG docker "$USER"   # keyin qayta login qiling
+```
+
+> **Paket nomiga e'tibor bering.** Compose ikki xil nomlanadi va bu tez-tez
+> `Unable to locate package` xatosini beradi:
+>
+> | Manba | Paket |
+> |---|---|
+> | Ubuntu repo'si (yuqoridagi, oddiyroq yo'l) | `docker-compose-v2` |
+> | Docker'ning o'z repo'si (`download.docker.com`) | `docker-compose-plugin` |
+>
+> Ikkalasi ham `docker compose` buyrug'ini beradi (defissiz — eski
+> `docker-compose` emas). Juda yangi Ubuntu relizlarida Docker'ning o'z
+> repo'sida hali mos release bo'lmasligi mumkin, shuning uchun Ubuntu
+> paketlari ishonchliroq.
+
+Tekshirish:
+
+```bash
+docker --version && docker compose version
+docker run --rm hello-world    # guruh a'zoligi ishlayaptimi
 ```
 
 ## 2. Sozlamalar
