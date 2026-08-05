@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { startScheduler } from './services/scheduler.service.js';
 import { pool } from './db/pool.js';
+import { captureError, flushSentry } from './instrument.js';
 
 const app = createApp();
 let scheduler = null;
@@ -36,6 +37,9 @@ const shutdown = (signal) => {
 
   server.close(async (err) => {
     if (err) console.error('[server] Error closing HTTP server:', err);
+    // Before the pool, and before exiting: Sentry batches over the network, so
+    // the crash report that triggered this shutdown is still only buffered.
+    await flushSentry();
     try {
       await pool.end();
     } catch (poolErr) {
@@ -55,10 +59,14 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 // unknown state, so a supervised restart is safer than limping on.
 process.on('unhandledRejection', (reason) => {
   console.error('[server] Unhandled promise rejection:', reason);
+  captureError(reason instanceof Error ? reason : new Error(String(reason)), {
+    kind: 'unhandledRejection',
+  });
   shutdown('unhandledRejection');
 });
 
 process.on('uncaughtException', (err) => {
   console.error('[server] Uncaught exception:', err);
+  captureError(err, { kind: 'uncaughtException' });
   shutdown('uncaughtException');
 });

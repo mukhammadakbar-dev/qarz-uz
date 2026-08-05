@@ -106,7 +106,36 @@ Tiklashni yiliga bir marta sinab ko'ring — sinalmagan zaxira bu taxmin:
 gunzip -c backups/qarz-YYYY-MM-DD-HHMM.sql.gz | docker compose exec -T db psql -U qarz -d qarz
 ```
 
-## 7. Yangilash
+## 7. Xatolik monitoringi (Sentry)
+
+Ixtiyoriy, lekin birinchi haqiqiy foydalanuvchilardan oldin yoqishni tavsiya
+qilaman — aks holda productiondagi xatoliklarni faqat log'ni ochib ko'rgandagina
+bilasiz.
+
+1. [sentry.io](https://sentry.io) da loyiha oching (Node.js), DSN ni oling.
+2. `.env` ga qo'ying: `SENTRY_DSN=https://...`
+3. `docker compose up -d` — backend va bot avtomatik ulanadi.
+
+`SENTRY_DSN` bo'sh bo'lsa monitoring **butunlay o'chiq**: `init()` ham
+chaqirilmaydi, hech qanday qo'shimcha yuk yo'q.
+
+Nima yuboriladi:
+
+| Manba | Qachon |
+|---|---|
+| Backend `errorHandler` | Faqat kutilmagan `500` xatoliklar. `AppError` va Postgres'ning mijoz xatolari (`400`/`409`/`422`) **yuborilmaydi** — ular haqiqiy nosozliklarni ko'mib tashlardi |
+| Backend `server.js` | `uncaughtException`, `unhandledRejection` |
+| Bot `bot.catch` | Update'ni qayta ishlashdagi har qanday xatolik |
+
+Nima **yuborilmaydi:** `sendDefaultPii: false` va `beforeSend` orqali so'rov
+tanasi, cookie'lar, `Authorization` va `x-bot-secret` header'lari tozalanadi.
+Botdan faqat telegram id va update turi ketadi, xabar matni emas — update'lar
+telefon raqami va qarz summalarini olib yuradi.
+
+`SENTRY_TRACES_SAMPLE_RATE` standart `0` (performans trace'lari o'chiq) —
+ular alohida hisoblanadi va tarifning qimmat qismi.
+
+## 8. Yangilash
 
 ```bash
 git pull
@@ -132,5 +161,6 @@ sababli har deployda qayta ishga tushirish xavfsiz.
   Umumiy hisoblagich kerak bo'lsa `rate-limit-redis` ga o'tish kerak.
 - **Cron (eslatmalar) har bir backend instansida ishlaydi.** Bir nechta instans
   ko'tarsangiz eslatmalar takrorlanadi — scheduler'ni alohida ajratish kerak.
-- **Xatolik monitoringi yo'q.** Loglar faqat `docker compose logs` da. Sentry
-  yoki shunga o'xshash narsa hali ulanmagan.
+- **Frontendda xatolik monitoringi yo'q.** Backend va bot Sentry'ga ulangan
+  (pastga qarang), lekin brauzerdagi xatoliklar faqat `ErrorBoundary` bilan
+  ushlanadi va hech qayerga yuborilmaydi.

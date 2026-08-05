@@ -1,5 +1,6 @@
 import { AppError } from '../utils/errors.js';
 import { config } from '../config/index.js';
+import { captureError } from '../instrument.js';
 
 export const notFoundHandler = (_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Endpoint topilmadi' } });
@@ -31,7 +32,7 @@ const BODY_ERRORS = {
 };
 
 // eslint-disable-next-line no-unused-vars
-export const errorHandler = (err, _req, res, _next) => {
+export const errorHandler = (err, req, res, _next) => {
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       error: { code: err.code, message: err.message },
@@ -46,7 +47,10 @@ export const errorHandler = (err, _req, res, _next) => {
   }
 
   // Genuinely unexpected: log with a stack, but never leak internals to callers.
+  // Only this branch is reported — AppError and the mapped Postgres/body cases
+  // above are client mistakes, and sending them would bury real faults in noise.
   console.error('[error]', err);
+  captureError(err, { method: req.method, path: req.path, userId: req.user?.id });
   res.status(500).json({
     error: {
       code: 'INTERNAL',

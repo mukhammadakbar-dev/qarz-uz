@@ -26,4 +26,6 @@ EXPOSE 3001
 # index.js calls process.exit(1) when polling stops with an error, and the
 # restart policy takes it from there.
 
-CMD ["node", "--dns-result-order=ipv4first", "src/index.js"]
+# --import loads Sentry before any application module. With no SENTRY_DSN set,
+# instrument.js does nothing.
+CMD ["node", "--import", "./src/instrument.js", "--dns-result-order=ipv4first", "src/index.js"]

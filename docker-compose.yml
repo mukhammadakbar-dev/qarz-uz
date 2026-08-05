@@ -92,6 +92,11 @@ services:
       SUPER_ADMIN_PHONE: ${SUPER_ADMIN_PHONE}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
 
+      # Optional. Empty = error reporting is off entirely, not merely silent.
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_RELEASE: ${SENTRY_RELEASE}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+
   bot:
     build:
       context: ./qarz-bot
@@ -115,6 +120,10 @@ services:
       WEBHOOK_URL: ${WEBHOOK_URL}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       PORT: 3001
+
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_RELEASE: ${SENTRY_RELEASE}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
 
   web:
     build:

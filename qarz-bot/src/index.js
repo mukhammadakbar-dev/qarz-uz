@@ -3,6 +3,7 @@ import { conversations, createConversation } from '@grammyjs/conversations';
 
 import { config } from './lib/config.js';
 import { sessions, hydrate, flush } from './lib/sessions.js';
+import { captureError, flushSentry } from './instrument.js';
 import { t } from './lib/i18n.js';
 
 import { handleStart, handleContact } from './handlers/auth.js';
@@ -88,6 +89,14 @@ bot.catch((err) => {
   if (e instanceof GrammyError) console.error('Telegram error:', e.description);
   else if (e instanceof HttpError) console.error('HTTP error:', e);
   else console.error('Unknown error:', e);
+
+  // Report the telegram id but never the message text — updates carry phone
+  // numbers, contact cards and debt amounts.
+  captureError(e instanceof Error ? e : new Error(String(e)), {
+    updateId: ctx?.update?.update_id,
+    telegramId: ctx?.from?.id,
+    updateType: Object.keys(ctx?.update || {}).find((k) => k !== 'update_id'),
+  });
 });
 
 // ---- Startup ----
@@ -179,6 +188,9 @@ const stop = async (signal) => {
     // them here — otherwise a token refreshed moments before SIGTERM never
     // reaches the database and that user is logged out on the next start.
     await flush();
+    // Sentry batches over the network, so a report from the error that caused
+    // this shutdown is still only buffered at this point.
+    await flushSentry();
   } catch (err) {
     console.error('[bot] Error during shutdown:', err);
   }
@@ -189,6 +201,9 @@ process.once('SIGTERM', () => stop('SIGTERM'));
 
 process.on('unhandledRejection', (reason) => {
   console.error('[bot] Unhandled promise rejection:', reason);
+  captureError(reason instanceof Error ? reason : new Error(String(reason)), {
+    kind: 'unhandledRejection',
+  });
 });
 
 start().catch((err) => {

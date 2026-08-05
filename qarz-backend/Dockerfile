@@ -39,4 +39,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Exec form, so node is PID 1 and receives SIGTERM directly — server.js already
 # handles it and drains in-flight requests.
-CMD ["node", "--dns-result-order=ipv4first", "src/server.js"]
+#
+# --import loads Sentry before any application module: it patches http, express
+# and pg at load time, so anything imported earlier stays uninstrumented. With
+# no SENTRY_DSN set, instrument.js does nothing.
+CMD ["node", "--import", "./src/instrument.js", "--dns-result-order=ipv4first", "src/server.js"]
