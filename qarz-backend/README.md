@@ -76,6 +76,23 @@ Seed'dan keyin super admin: `+998900000000 / admin12345` (env orqali o'zgartirin
 | POST | `/webhooks/click/prepare` | Click Prepare (imzo tekshiriladi) |
 | POST | `/webhooks/click/complete` | Click Complete → qarz avtomatik yangilanadi |
 
+### Telegram bot sessiyalari (`/api/bot`, `x-bot-secret` header)
+Bot foydalanuvchilarining tokenlarini saqlaydigan do'kon. Foydalanuvchi tokeni bilan **emas**, `BOT_SHARED_SECRET` bilan himoyalangan — chunki bot barcha foydalanuvchilar bo'ylab ishlaydi. Shu sababli bu kalit yuqori qiymatga ega: uni brauzer klientiga bermang.
+
+| Metod | Yo'l | Tavsif |
+|---|---|---|
+| GET | `/sessions` | Hamma sessiya (bot ishga tushganda keshni to'ldiradi) |
+| PUT | `/sessions/:telegramId` | Sessiyani yozish/almashtirish (maks. 8KB) |
+| DELETE | `/sessions/:telegramId` | Sessiyani o'chirish (logout) |
+
+Tekshirildi: `tests/bot_sessions_test.mjs` (21 ta).
+
+### Health
+| Metod | Yo'l | Tavsif |
+|---|---|---|
+| GET | `/health` | Liveness — jarayon tirikmi. DB'ga **tegmaydi**: qayta ishga tushirish o'lgan Postgres'ni tuzatmaydi, shuning uchun orkestrator konteynerni o'ldirmasligi kerak |
+| GET | `/health/ready` | Readiness — DB javob beradimi. Bermasa `503`, load balancer trafikni to'xtatadi |
+
 ## Muhim biznes-mantiq
 
 **Kunlik aylanma** = qo'lda kiritilgan naqd/karta + o'sha kuni yozilgan `given` qarzlar (avtomatik `daily_sales`ga qo'shiladi).
@@ -237,4 +254,17 @@ curl -X POST http://localhost:4000/api/admin/broadcast \
 ```
 Telegram bog'langan bo'lsa Telegram orqali, aks holda SMS orqali — debtor eslatmalari bilan bir xil kanal tanlash mantig'i. Audit log'ga yoziladi. Tekshirildi: `tests/broadcast_test.mjs` (12 ta).
 
-Jami: **128 ta backend test, 0 ta xato**.
+Jami: **199 ta backend test, 0 ta xato** (`npm test`).
+
+---
+
+## Productionga chiqarish
+
+To'liq qo'llanma: [`../DEPLOY.md`](../DEPLOY.md) — Docker Compose, nginx + TLS, zaxira nusxa.
+
+Diqqat qilinadigan sozlamalar:
+
+- `CORS_ORIGINS` — bo'sh qolsa istalgan sayt API'ni foydalanuvchi tokeni bilan boshqara oladi.
+- `TRUST_PROXY` — proxy soni. Rate limit `req.ip` ga bog'langan: past qiymat hamma foydalanuvchini bitta chelakka yig'adi, baland qiymat mijozga IP soxtalashtirishga imkon beradi.
+- `DB_SSL` — boshqariladigan Postgres (Neon, Supabase, RDS) ochiq ulanishni rad etadi, `true` qiling.
+- `JWT_*` va `PAYMENT_LINK_SECRET` — productionda zaif yoki namunaviy qiymat bo'lsa **backend ishga tushmaydi** (`src/config/index.js`).

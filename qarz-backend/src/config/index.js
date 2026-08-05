@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { readFileSync } from 'fs';
 dotenv.config();
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -93,6 +94,42 @@ export const config = {
     user: required('DB_USER', 'postgres'),
     password: required('DB_PASSWORD', 'postgres'),
     database: required('DB_NAME', 'qarz'),
+
+    /**
+     * TLS for the Postgres connection. Managed providers (Neon, Supabase, RDS,
+     * DigitalOcean) refuse plaintext connections outright, so without this the
+     * app simply cannot reach them.
+     *
+     *   DB_SSL=false     no TLS — a local/compose Postgres on a private network
+     *   DB_SSL=true      TLS, certificate verified against DB_SSL_CA or the
+     *                    system trust store (the correct production setting)
+     *   DB_SSL=no-verify TLS, certificate NOT verified. Encrypts the wire but
+     *                    accepts any certificate, so it does not protect against
+     *                    an active man-in-the-middle. Only for providers that
+     *                    issue self-signed certs and publish no CA bundle.
+     */
+    ssl: (() => {
+      const mode = String(process.env.DB_SSL || '').trim().toLowerCase();
+      if (!mode || mode === 'false' || mode === '0') return false;
+
+      if (mode === 'no-verify') {
+        if (isProd) {
+          console.warn(
+            '[config] DB_SSL=no-verify: the database certificate is NOT verified. ' +
+              'Traffic is encrypted but open to an active man-in-the-middle. ' +
+              'Prefer DB_SSL=true with DB_SSL_CA in production.'
+          );
+        }
+        return { rejectUnauthorized: false };
+      }
+
+      const ssl = { rejectUnauthorized: true };
+      // Providers that sign with their own root need that root supplied here,
+      // either inline (PEM text) or as a path to the bundle on disk.
+      const ca = process.env.DB_SSL_CA;
+      if (ca) ssl.ca = ca.includes('BEGIN CERTIFICATE') ? ca : readFileSync(ca, 'utf-8');
+      return ssl;
+    })(),
   },
 
   jwt: {

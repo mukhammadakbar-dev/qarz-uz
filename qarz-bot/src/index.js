@@ -2,7 +2,7 @@ import { Bot, session, GrammyError, HttpError } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 
 import { config } from './lib/config.js';
-import { sessions } from './lib/sessions.js';
+import { sessions, hydrate, flush } from './lib/sessions.js';
 import { t } from './lib/i18n.js';
 
 import { handleStart, handleContact } from './handlers/auth.js';
@@ -96,6 +96,18 @@ const start = async () => {
     console.error('[bot] Cannot start: TELEGRAM_BOT_TOKEN is missing.');
     process.exit(1);
   }
+
+  // Load stored sessions BEFORE any update is accepted. Serving a user off an
+  // empty cache would look like a logged-out session and, worse, the next write
+  // would persist that emptiness over their real tokens.
+  try {
+    await hydrate();
+  } catch (err) {
+    console.error(`[bot] Cannot start: ${err.message}`);
+    console.error('[bot] Check API_BASE_URL and that the backend is running.');
+    process.exit(1);
+  }
+
   try {
     await bot.api.setMyCommands([
       { command: 'start', description: 'Botni ishga tushirish / Запуск' },
@@ -163,6 +175,10 @@ const stop = async (signal) => {
   try {
     await bot.stop();
     webServer?.close();
+    // Session writes are fire-and-forget during normal operation, so drain
+    // them here — otherwise a token refreshed moments before SIGTERM never
+    // reaches the database and that user is logged out on the next start.
+    await flush();
   } catch (err) {
     console.error('[bot] Error during shutdown:', err);
   }
