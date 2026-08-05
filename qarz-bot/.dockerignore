@@ -1,0 +1,19 @@
+# Never bake secrets into an image layer — they persist even if a later layer
+# deletes them, and anyone who can pull the image can read them.
+.env
+.env.*
+!.env.example
+
+node_modules
+npm-debug.log*
+*.log
+
+# Orphaned local session store (superseded by the backend session store).
+.sessions.json
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+tests
