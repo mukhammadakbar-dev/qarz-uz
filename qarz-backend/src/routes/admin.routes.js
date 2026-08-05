@@ -10,6 +10,8 @@ import {
   setShopActive,
   auditLog,
   broadcast,
+  extendSubscription,
+  listSubscriptionPayments,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -32,6 +34,19 @@ router.patch(
   validate(adminSchemas.setShopActive),
   setShopActive
 );
+// Manual subscription activation — how shops are billed until Click is live.
+router.patch(
+  '/shops/:shopId/subscription',
+  validate(adminSchemas.shopIdParam, 'params'),
+  validate(adminSchemas.extendSubscription),
+  extendSubscription
+);
+router.get(
+  '/shops/:shopId/subscription-payments',
+  validate(adminSchemas.shopIdParam, 'params'),
+  listSubscriptionPayments
+);
+
 router.get('/audit-log', auditLog);
 router.post('/broadcast', validate(adminSchemas.broadcast), broadcast);
 

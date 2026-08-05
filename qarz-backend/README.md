@@ -64,10 +64,34 @@ Seed'dan keyin super admin: `+998900000000 / admin12345` (env orqali o'zgartirin
 | Metod | Yo'l | Tavsif |
 |---|---|---|
 | GET | `/shops?search=&plan=&status=` | Barcha do'konlar |
-| GET | `/stats` | Platforma statistikasi (MRR, faol obunalar, SMS) |
+| GET | `/stats` | Platforma statistikasi (MRR, shu oygi tushum, faol obunalar, SMS) |
 | GET | `/plans` / PATCH `/plans/:code` | Tariflarni sozlash |
-| PATCH | `/shops/:shopId/active` | Bloklash/faollashtirish |
+| PATCH | `/shops/:shopId/active` | Bloklash/faollashtirish (login) |
+| PATCH | `/shops/:shopId/subscription` | Obunani qo'lda uzaytirish + to'lovni qayd etish |
+| GET | `/shops/:shopId/subscription-payments` | Do'konning to'lov tarixi |
 | GET | `/audit-log` | Faoliyat jurnali |
+
+#### Obunani qo'lda uzaytirish
+
+Click integratsiyasi qo'shilgunicha obunalar shu yo'l bilan faollashtiriladi: do'kon egasi adminga yozadi, to'laydi, admin muddatni uzaytiradi.
+
+```bash
+curl -X PATCH http://localhost:4000/api/admin/shops/$SHOP_ID/subscription \
+  -H "Authorization: Bearer $SUPER_ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"plan":"pro","months":3,"amountUzs":450000,"note":"Naqd, do'\''konda"}'
+# -> {"ok":true,"shopName":"...","plan":"pro","endsAt":"...","payment":{...}}
+```
+
+- **`plan` ixtiyoriy** — berilmasa joriy tarif saqlanadi, ya'ni oddiy uzaytirish tarifni tasodifan o'zgartirib yubormaydi.
+- **Muddat mavjud tugash sanasidan uzayadi**, agar u hali kelmagan bo'lsa. Erta to'lagan do'kon allaqachon sotib olgan kunlarini yo'qotmaydi. Muddati o'tib ketgan do'kon esa bugundan boshlanadi — o'tgan bo'shliq uchun hisoblanmaydi.
+- **`amountUzs: 0` ruxsat etilgan** — bepul uzaytirish ham qayd etilishi kerak bo'lgan hodisa.
+- **Tarif o'zgarsa `sms_balance` ham yangilanadi**: `monthly_limit` yangi tarifga o'tadi va oshgan bo'lsa `remaining` darhol farqqa to'ldiriladi. Pasaytirishda allaqachon berilgan SMS qaytarib olinmaydi.
+- Hammasi bitta tranzaksiyada, qator `FOR UPDATE` bilan qulflanadi — ikki admin bir vaqtda uzaytirsa bitta muddat ikki to'lovga berilib ketmaydi.
+- `audit_logs` ga `extend_subscription` yozuvi tushadi.
+
+`PATCH /shops/:shopId/active` dan farqi: u `users.is_active` ni o'zgartiradi (moderatsiya — suiiste'mol qilgan do'konni bloklash). To'lagan do'kon ham bloklangan bo'lishi mumkin, bloklangan do'konning obunasi ham uzaytirilishi mumkin. Ularni birlashtirsak, blokdan chiqarish jimgina bepul vaqt berib yuborardi.
+
+To'lovlar `subscription_payments` jadvalida (`method='manual'`). Click qo'shilganda uning callback'lari shu jadvalga `method='click'` bilan tushadi va tarix uzilmaydi. Tekshirildi: `tests/subscription_extend_test.mjs` (48 ta).
 
 ### Ommaviy to'lov (auth yo'q)
 | Metod | Yo'l | Tavsif |
@@ -254,7 +278,7 @@ curl -X POST http://localhost:4000/api/admin/broadcast \
 ```
 Telegram bog'langan bo'lsa Telegram orqali, aks holda SMS orqali — debtor eslatmalari bilan bir xil kanal tanlash mantig'i. Audit log'ga yoziladi. Tekshirildi: `tests/broadcast_test.mjs` (12 ta).
 
-Jami: **199 ta backend test, 0 ta xato** (`npm test`).
+Jami: **247 ta backend test, 0 ta xato** (`npm test`).
 
 ---
 

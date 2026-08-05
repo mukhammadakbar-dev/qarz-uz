@@ -149,6 +149,11 @@ export const api = {
     raw(`/api/admin/plans/${code}`, { method: 'PATCH', body: payload }),
   adminSetShopActive: (shopId, active) =>
     raw(`/api/admin/shops/${shopId}/active`, { method: 'PATCH', body: { active } }),
+  // Manual subscription activation — how shops are billed until Click is live.
+  adminExtendSubscription: (shopId, payload) =>
+    raw(`/api/admin/shops/${shopId}/subscription`, { method: 'PATCH', body: payload }),
+  adminSubscriptionPayments: (shopId) =>
+    raw(`/api/admin/shops/${shopId}/subscription-payments`),
   adminAuditLog: () => raw('/api/admin/audit-log'),
   adminBroadcast: (message) => raw('/api/admin/broadcast', { method: 'POST', body: { message } }),
 };

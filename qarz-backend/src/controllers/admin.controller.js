@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { asyncHandler, NotFound } from '../utils/errors.js';
-import { query } from '../db/pool.js';
+import { query, withTransaction } from '../db/pool.js';
 import { sendTelegramMessage } from '../services/telegram.service.js';
 import { sendSms } from '../services/sms.service.js';
 
@@ -27,6 +27,15 @@ export const adminSchemas = {
   shopIdParam: z.object({ shopId: z.string().uuid() }),
   broadcast: z.object({
     message: z.string().min(1, 'Xabar bo\'sh bo\'lmasligi kerak').max(1000, 'Xabar juda uzun'),
+  }),
+  extendSubscription: z.object({
+    // Omitted = keep whatever plan the shop is already on, so a plain renewal
+    // does not have to restate it and cannot silently change it by accident.
+    plan: z.enum(['start', 'pro', 'business']).optional(),
+    months: z.number().int().min(1, 'Kamida 1 oy').max(24, 'Ko\'pi bilan 24 oy'),
+    // 0 is valid: a comped extension is still a real event to record.
+    amountUzs: z.number().nonnegative('Summa manfiy bo\'lmasligi kerak'),
+    note: z.string().max(500).optional(),
   }),
 };
 
@@ -76,9 +85,9 @@ export const listShops = asyncHandler(async (req, res) => {
 });
 
 export const platformStats = asyncHandler(async (_req, res) => {
-  // Four independent aggregates: run them concurrently rather than paying four
-  // sequential round-trips on a page that is polled by the admin dashboard.
-  const [shops, activeSubs, smsUsed, revenue] = await Promise.all([
+  // Independent aggregates: run them concurrently rather than paying a
+  // sequential round-trip each on a page the admin dashboard polls.
+  const [shops, activeSubs, smsUsed, revenue, collected] = await Promise.all([
     query('SELECT COUNT(*) AS c FROM shops'),
     query(
       `SELECT COUNT(*) AS c FROM subscriptions WHERE status IN ('active','trial') AND ends_at > now()`
@@ -92,12 +101,21 @@ export const platformStats = asyncHandler(async (_req, res) => {
        FROM subscriptions sub JOIN plans p ON p.code = sub.plan
        WHERE sub.status = 'active'`
     ),
+    // Money actually received this month. Distinct from the MRR figure above,
+    // which is what active subscriptions are nominally worth — the two diverge
+    // whenever a shop pays for several months at once, or is comped.
+    query(
+      `SELECT COALESCE(SUM(amount_uzs),0) AS total
+       FROM subscription_payments
+       WHERE created_at >= date_trunc('month', CURRENT_DATE)`
+    ),
   ]);
   res.json({
     totalShops: Number(shops.rows[0].c),
     activeSubscriptions: Number(activeSubs.rows[0].c),
     smsThisMonth: Number(smsUsed.rows[0].c),
     monthlyRecurringRevenue: Number(revenue.rows[0].total),
+    collectedThisMonth: Number(collected.rows[0].total),
   });
 });
 
@@ -246,4 +264,134 @@ export const broadcast = asyncHandler(async (req, res) => {
     smsSent,
     failed,
   });
+});
+
+/**
+ * PATCH /api/admin/shops/:shopId/subscription
+ *
+ * Activate or extend a shop's subscription by hand, and record what was paid.
+ * This is how subscriptions work until Click is integrated: the owner messages
+ * the admin, pays, and the admin extends the period here.
+ *
+ * Deliberately separate from setShopActive: that toggles users.is_active, which
+ * is the moderation lever (block an abusive shop). A paid-up shop can still be
+ * blocked, and a blocked shop's subscription can still be extended. Conflating
+ * them would mean unblocking someone silently gave them free time.
+ */
+export const extendSubscription = asyncHandler(async (req, res) => {
+  const { shopId } = req.params;
+  const { months, amountUzs, note } = req.body;
+
+  const result = await withTransaction(async (client) => {
+    const shop = await client.query('SELECT id, name FROM shops WHERE id = $1', [shopId]);
+    if (!shop.rows[0]) throw NotFound('Do\'kon topilmadi');
+
+    // Lock the row: two admins extending the same shop at once would otherwise
+    // both read the same ends_at and the second would overwrite the first,
+    // granting one period for two payments.
+    const current = await client.query(
+      `SELECT id, plan, ends_at FROM subscriptions
+       WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1
+       FOR UPDATE`,
+      [shopId]
+    );
+    const sub = current.rows[0];
+    const oldPlan = sub?.plan || 'start';
+    const plan = req.body.plan || oldPlan;
+
+    // Extend from whichever is later: now, or the existing expiry. Paying
+    // early is common and must not forfeit the days already paid for, while an
+    // account that lapsed three months ago must not be credited for that gap.
+    const now = new Date();
+    const base = sub && new Date(sub.ends_at) > now ? new Date(sub.ends_at) : now;
+    const endsAt = new Date(base);
+    // setMonth handles month lengths and year rollover; adding 30-day chunks
+    // would drift a renewal date backwards over a year.
+    endsAt.setMonth(endsAt.getMonth() + months);
+
+    if (sub) {
+      await client.query(
+        `UPDATE subscriptions
+         SET plan = $2, status = 'active', ends_at = $3, updated_at = now()
+         WHERE id = $1`,
+        [sub.id, plan, endsAt]
+      );
+    } else {
+      // A shop with no subscription row at all is treated as expired by
+      // enforceSubscription, so create one rather than leaving it stuck.
+      await client.query(
+        `INSERT INTO subscriptions (shop_id, plan, status, starts_at, ends_at)
+         VALUES ($1, $2, 'active', now(), $3)`,
+        [shopId, plan, endsAt]
+      );
+    }
+
+    // The SMS quota lives on sms_balance and is what the monthly reset copies
+    // from, so a plan change that skipped it would leave an upgraded shop on
+    // the old allowance until someone noticed.
+    if (plan !== oldPlan) {
+      const planRow = await client.query('SELECT monthly_sms FROM plans WHERE code = $1', [plan]);
+      const newLimit = planRow.rows[0]?.monthly_sms;
+      if (newLimit !== undefined) {
+        // Credit an upgrade immediately — a shop that pays for Pro today
+        // expects the bigger allowance today, not after the next reset. A
+        // downgrade only lowers the limit for future resets; clawing back
+        // messages already granted would be a surprise mid-month.
+        await client.query(
+          `UPDATE sms_balance
+           SET remaining = remaining + GREATEST($2 - monthly_limit, 0),
+               monthly_limit = $2,
+               updated_at = now()
+           WHERE shop_id = $1`,
+          [shopId, newLimit]
+        );
+      }
+    }
+
+    const payment = await client.query(
+      `INSERT INTO subscription_payments
+         (shop_id, amount_uzs, method, plan, months, period_start, period_end, note, recorded_by)
+       VALUES ($1, $2, 'manual', $3, $4, $5, $6, $7, $8)
+       RETURNING id, amount_uzs, plan, months, period_start, period_end, created_at`,
+      [shopId, amountUzs, plan, months, base, endsAt, note || null, req.user.id]
+    );
+
+    return { shopName: shop.rows[0].name, plan, endsAt, payment: payment.rows[0] };
+  });
+
+  await logAction(req.user.id, 'extend_subscription', {
+    shopId,
+    plan: result.plan,
+    months,
+    amountUzs,
+    endsAt: result.endsAt,
+    note: note || null,
+  });
+
+  res.json({
+    ok: true,
+    shopName: result.shopName,
+    plan: result.plan,
+    endsAt: result.endsAt,
+    payment: result.payment,
+  });
+});
+
+/**
+ * GET /api/admin/shops/:shopId/subscription-payments
+ * Payment history for one shop, newest first.
+ */
+export const listSubscriptionPayments = asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `SELECT sp.id, sp.amount_uzs, sp.method, sp.plan, sp.months,
+            sp.period_start, sp.period_end, sp.note, sp.created_at,
+            u.phone AS recorded_by_phone
+     FROM subscription_payments sp
+     LEFT JOIN users u ON u.id = sp.recorded_by
+     WHERE sp.shop_id = $1
+     ORDER BY sp.created_at DESC
+     LIMIT 100`,
+    [req.params.shopId]
+  );
+  res.json(rows);
 });

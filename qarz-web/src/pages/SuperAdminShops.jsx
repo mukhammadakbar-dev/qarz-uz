@@ -4,6 +4,7 @@ import { som, grp, fmtDate } from '../lib/format.js';
 import { useToast } from '../components/Toast.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import BroadcastCard from '../components/BroadcastCard.jsx';
+import ExtendSubscriptionModal from '../components/ExtendSubscriptionModal.jsx';
 import './SuperAdminShops.css';
 
 const STATUS_LABEL = {
@@ -21,6 +22,11 @@ export default function SuperAdminShops() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [busyId, setBusyId] = useState(null);
+  // Which shop's subscription dialog is open, if any.
+  const [extending, setExtending] = useState(null);
+  // Plan prices, so the dialog can suggest an amount. Fetched once — they
+  // change rarely, and refetching per dialog would flash an empty suggestion.
+  const [plans, setPlans] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,6 +50,12 @@ export default function SuperAdminShops() {
     return () => clearTimeout(id);
   }, [load, search]);
 
+  useEffect(() => {
+    // Prices only drive a suggestion the admin can override, so a failure here
+    // degrades to an empty field rather than blocking the page.
+    api.adminPlans().then((p) => setPlans(Array.isArray(p) ? p : [])).catch(() => setPlans([]));
+  }, []);
+
   const toggleActive = async (shop) => {
     setBusyId(shop.id);
     try {
@@ -66,6 +78,7 @@ export default function SuperAdminShops() {
         <MiniStat label="Faol obunalar" value={stats ? grp(stats.activeSubscriptions) : '—'} />
         <MiniStat label="SMS (shu oy)" value={stats ? grp(stats.smsThisMonth) : '—'} />
         <MiniStat label="Oylik daromad" value={stats ? som(stats.monthlyRecurringRevenue) : '—'} />
+        <MiniStat label="Tushum (shu oy)" value={stats ? som(stats.collectedThisMonth) : '—'} />
       </div>
 
       <BroadcastCard />
@@ -106,7 +119,7 @@ export default function SuperAdminShops() {
                 <th>Holat</th>
                 <th>Muddati</th>
                 <th style={{ textAlign: 'right' }}>SMS</th>
-                <th style={{ textAlign: 'center' }}>Amal</th>
+                <th>Amal</th>
               </tr>
             </thead>
             <tbody>
@@ -120,14 +133,19 @@ export default function SuperAdminShops() {
                     <td><span className={`badge ${meta.cls}`}>{meta.label}</span></td>
                     <td className="muted small">{s.ends_at ? fmtDate(s.ends_at) : '—'}</td>
                     <td style={{ textAlign: 'right' }} className="num muted">{grp(s.sms_remaining ?? 0)}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        className={`btn btn-mini ${s.is_active ? 'btn-mini-danger' : ''}`}
-                        disabled={busyId === s.id}
-                        onClick={() => toggleActive(s)}
-                      >
-                        {busyId === s.id ? <span className="spinner" /> : s.is_active ? 'Bloklash' : 'Faollashtirish'}
-                      </button>
+                    <td>
+                      <div className="sa-actions">
+                        <button className="btn btn-mini" onClick={() => setExtending(s)}>
+                          Uzaytirish
+                        </button>
+                        <button
+                          className={`btn btn-mini ${s.is_active ? 'btn-mini-danger' : ''}`}
+                          disabled={busyId === s.id}
+                          onClick={() => toggleActive(s)}
+                        >
+                          {busyId === s.id ? <span className="spinner" /> : s.is_active ? 'Bloklash' : 'Faollashtirish'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -136,6 +154,15 @@ export default function SuperAdminShops() {
           </table>
         )}
       </div>
+
+      {extending && (
+        <ExtendSubscriptionModal
+          shop={extending}
+          plans={plans}
+          onClose={() => setExtending(null)}
+          onDone={() => { setExtending(null); load(); }}
+        />
+      )}
     </>
   );
 }
