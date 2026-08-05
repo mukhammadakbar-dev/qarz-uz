@@ -40,7 +40,7 @@ src/
 ├─ lib/
 │  ├─ config.js          # env
 │  ├─ api.js             # backend API klienti (fetch)
-│  ├─ sessions.js        # token/til saqlash (fayl asosida — prod'da Redis)
+│  ├─ sessions.js        # token/til saqlash (backend DB + xotira keshi)
 │  └─ i18n.js            # uz/ru tarjima + money formatlash
 ├─ locales/{uz,ru}.js    # matnlar
 ├─ keyboards/index.js    # menyu, kontakt, til klaviaturalari
@@ -60,13 +60,19 @@ src/
 4. Mos kelmasa → telefon eslab qolinadi, `/register` orqali bepul akkaunt yaratish taklif qilinadi.
 
 ## Eslatma
-- Sessiyalar hozircha `.sessions.json` faylida saqlanadi (soddalik uchun). Ishlab chiqarishda Redis yoki backend DB'ga ko'chirish tavsiya etiladi.
+- Sessiyalar backend DB'sida saqlanadi (`bot_sessions` jadvali), `/api/bot/sessions` endpoint'lari orqali. Bot ishga tushganda hammasini bir marta o'qib xotiraga oladi va har o'zgarishda backendga yozadi. Shu sababli konteyner qayta yaratilsa ham foydalanuvchilar tizimdan chiqib ketmaydi. Eski `.sessions.json` fayli endi ishlatilmaydi.
+- **Bot faqat bitta instansda ishlashi kerak.** Long polling ikkitasini ko'tarmaydi, va sessiya keshi jarayon ichida turadi — ikkinchi instans eskirgan keshda ishlaydi.
 - Webhook rejimi qo'llab-quvvatlanadi: `.env` da `USE_WEBHOOK=true` va `WEBHOOK_URL` ni bering.
 - Bildirishnoma yuborish (eslatma) backend cron'i tomonidan Telegram Bot API orqali amalga oshiriladi — bot bu xabarlarni qabul qiluvchi kanal.
 
 ## ⚠️ Muhim: BOT_SHARED_SECRET
 
-`.env`dagi `BOT_SHARED_SECRET` backend'dagi xuddi shu qiymatga teng bo'lishi **shart** — aks holda `/register` orqali ro'yxatdan o'tish ishlamay qoladi (backend OTP so'raydi, bot esa buni hal qila olmaydi).
+`.env`dagi `BOT_SHARED_SECRET` backend'dagi xuddi shu qiymatga teng bo'lishi **shart**. U ikki narsani ochadi:
+
+1. `/register` orqali OTP'siz ro'yxatdan o'tish (mos kelmasa backend OTP so'raydi, bot esa buni hal qila olmaydi);
+2. sessiya do'koni (`/api/bot/sessions`) — mos kelmasa **bot umuman ishga tushmaydi** va `Session store unreachable: HTTP 403` xatosini beradi.
+
+Bu kalit har bir bot foydalanuvchisining access va refresh tokenini ochadi — uni brauzer klientiga hech qachon bermang.
 
 ---
 

@@ -11,7 +11,6 @@ import Debtors from './pages/Debtors.jsx';
 import Sales from './pages/Sales.jsx';
 import Staff from './pages/Staff.jsx';
 import SuperAdminShops from './pages/SuperAdminShops.jsx';
-import SuperAdminStats from './pages/SuperAdminStats.jsx';
 import SuperAdminPlans from './pages/SuperAdminPlans.jsx';
 import SuperAdminAuditLog from './pages/SuperAdminAuditLog.jsx';
 
@@ -91,7 +90,6 @@ export default function App() {
                 <Route path="/staff" element={<OwnerOnly><Staff /></OwnerOnly>} />
 
                 <Route path="/super-admin" element={<SuperAdminProtected><SuperAdminShops /></SuperAdminProtected>} />
-                <Route path="/super-admin/stats" element={<SuperAdminProtected><SuperAdminStats /></SuperAdminProtected>} />
                 <Route path="/super-admin/plans" element={<SuperAdminProtected><SuperAdminPlans /></SuperAdminProtected>} />
                 <Route path="/super-admin/audit-log" element={<SuperAdminProtected><SuperAdminAuditLog /></SuperAdminProtected>} />
 

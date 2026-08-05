@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node --dns-result-order=ipv4first src/server.js",
-    "dev": "node --dns-result-order=ipv4first --watch src/server.js",
+    "start": "node --import ./src/instrument.js --dns-result-order=ipv4first src/server.js",
+    "dev": "node --import ./src/instrument.js --dns-result-order=ipv4first --watch src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
     "reset-admin-password": "node src/db/resetAdminPassword.js",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "@sentry/node": "^10.69.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -28,7 +29,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "pg-mem": "^3.0.14",
-    "oxlint": "^1.71.0"
+    "oxlint": "^1.71.0",
+    "pg-mem": "^3.0.14"
   }
 }

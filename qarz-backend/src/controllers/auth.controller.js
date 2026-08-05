@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { z } from 'zod';
 import { asyncHandler } from '../utils/errors.js';
 import {
@@ -15,7 +14,7 @@ import {
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from '../utils/tokens.js';
 import { Unauthorized } from '../utils/errors.js';
 import { query } from '../db/pool.js';
-import { config } from '../config/index.js';
+import { hasBotSecret } from '../middleware/botAuth.js';
 
 const otpField = z.string().regex(/^\d{6}$/, 'Kod 6 xonali bo\'lishi kerak');
 
@@ -78,20 +77,10 @@ export const schemas = {
  * The Telegram bot may skip the registration OTP, because a shared contact in
  * an authenticated Telegram session already proves control of the number.
  *
- * This is decided from a server-side shared secret header — never from the
- * request body, which a client could simply set itself.
+ * The check itself lives in middleware/botAuth.js so the bot session store and
+ * these registration routes cannot drift apart on how the secret is compared.
  */
-const isTrustedBot = (req) => {
-  const secret = config.botSharedSecret;
-  if (!secret) return false;
-  const provided = req.get('x-bot-secret');
-  if (typeof provided !== 'string' || provided.length === 0) return false;
-  // Constant-time compare so the secret can't be recovered byte-by-byte by
-  // timing the response. Buffers must match in length for timingSafeEqual.
-  const a = Buffer.from(provided, 'utf8');
-  const b = Buffer.from(secret, 'utf8');
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-};
+const isTrustedBot = hasBotSecret;
 
 export const requestRegisterOtpCtrl = asyncHandler(async (req, res) => {
   const result = await requestRegisterOtp(req.body);
