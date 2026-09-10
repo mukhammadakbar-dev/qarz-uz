@@ -19,6 +19,7 @@ export default {
     '<b>Temir Daftar — Asosiy Menyusi</b> 📋\n\n💡 <b>Qarzlarni 2 xil usulda yozishingiz mumkin:</b>\n\n1️⃣ <b>🤖 AI Yordamchi (Eng osoni):</b>\nForma to\'ldirmasdan, shunchaki chatga oddiy matn yozing!\n<i>Masalan:</i> <code>Ali 100ming som dushanba</code>\n\n2️⃣ <b>📋 Menyudagi tugmalar:</b>\nTugmalar orqali bosqichma-bosqich yozing.\n\nAmalni tanlang 👇',
   menu_ai: '🤖 AI Yordamchi',
   menu_add_debt: '➕ Qarz yozish',
+  menu_reduce_debt: '➖ Qarz o\'chirish',
   menu_debtors: '👥 Qarzdorlar',
   menu_dashboard: '📊 Hisobot',
   menu_daily_sales: '💰 Kunlik savdo',
@@ -125,4 +126,11 @@ export default {
     '🔎 Shunga o\'xshash mijoz topildi. Kimga qarz yozamiz?',
   dup_new_btn: '➕ Yangi mijoz',
   dup_option: '{name}{phone} — {outstanding}',
+
+  // --- Reduce debt ---
+  ask_reduce_debtor: 'Qaysi qarzdordan qarz o\'chirilsin?',
+  ask_reduce_amount: '<b>{name}</b> (Jami qarz: {outstanding} so\'m)\n\nQancha qarz o\'chiriladi / qaytarildi? (summani kiriting):',
+  reduce_amount_invalid: 'Iltimos, to\'g'ri summa kiriting (masalan: 100000).',
+  reduce_success: '✅ <b>{name}</b> dan <b>{amount} so'm</b> qarz o\'chirildi.\n\n💰 Qolgan qarz: <b>{remaining} so'm</b>',
+  no_debt_to_reduce: 'Ushbu qarzdorda o\'chirish uchun ochiq qarz topilmadi.',
 };

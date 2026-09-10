@@ -8,29 +8,13 @@ export const contactKeyboard = (lang) =>
     .resized()
     .oneTime();
 
-export const mainMenu = (lang, role) => {
+export const mainMenu = (lang) => {
   const kb = new Keyboard()
-    .text(t('menu_ai', lang))
-    .row()
     .text(t('menu_add_debt', lang))
-    .text(t('menu_debtors', lang))
-    .row();
-  // Telegram only accepts an https:// url on a web_app button and silently
-  // drops the button otherwise, so this stays absent rather than broken until
-  // WEB_APP_URL is actually a public HTTPS deployment.
-  if (config.webAppUrl) {
-    kb.webApp(t('menu_webapp', lang), config.webAppUrl).row();
-  }
-  // shop-owner-only features
-  if (role === 'shop_owner' || role === 'staff') {
-    kb.text(t('menu_dashboard', lang)).text(t('menu_daily_sales', lang)).row();
-  }
-  // Paying for the subscription is the owner's job — staff cannot renew it, so
-  // showing them the button would only lead to a dead end.
-  if (role === 'shop_owner') {
-    kb.text(t('menu_subscription', lang)).row();
-  }
-  kb.text(t('menu_lang', lang));
+    .text(t('menu_reduce_debt', lang))
+    .row()
+    .text(t('menu_lang', lang))
+    .text(t('menu_ai', lang));
   return kb.resized();
 };
 

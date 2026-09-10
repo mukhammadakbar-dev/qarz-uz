@@ -20,6 +20,7 @@ import {
 } from './handlers/menu.js';
 
 import { addDebtConversation } from './scenes/addDebt.js';
+import { reduceDebtConversation } from './scenes/reduceDebt.js';
 import { dailySalesConversation } from './scenes/dailySales.js';
 import { registerConversation } from './scenes/register.js';
 import { handleAiMessage, handleAiCallback, handleAiGuide } from './handlers/aiHandler.js';
@@ -31,6 +32,7 @@ let webServer = null;
 bot.use(session({ initial: () => ({}) }));
 bot.use(conversations());
 bot.use(createConversation(addDebtConversation, 'addDebt'));
+bot.use(createConversation(reduceDebtConversation, 'reduceDebt'));
 bot.use(createConversation(dailySalesConversation, 'dailySales'));
 bot.use(createConversation(registerConversation, 'register'));
 // Auto-persist session for any Telegram user who interacts with the bot
@@ -81,6 +83,7 @@ bot.on('message:text', async (ctx, next) => {
   const text = ctx.message.text;
   if (matches(text, 'menu_ai')) return handleAiGuide(ctx);
   if (matches(text, 'menu_add_debt')) return ctx.conversation.enter('addDebt');
+  if (matches(text, 'menu_reduce_debt')) return ctx.conversation.enter('reduceDebt');
   if (matches(text, 'menu_debtors')) return handleDebtors(ctx);
   if (matches(text, 'menu_dashboard')) return handleDashboard(ctx);
   if (matches(text, 'menu_daily_sales')) return ctx.conversation.enter('dailySales');
