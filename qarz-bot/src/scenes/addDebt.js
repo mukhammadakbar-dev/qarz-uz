@@ -1,8 +1,7 @@
-import { InputFile, InlineKeyboard } from 'grammy';
+import { InlineKeyboard } from 'grammy';
 import { t, tPlain, money } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { sessions } from '../lib/sessions.js';
-import { getRemoteConfig } from '../lib/remoteConfig.js';
 import { cancelKeyboard, mainMenu } from '../keyboards/index.js';
 
 const isCancel = (text, lang) => text === t('cancel_btn', lang) || text === '/cancel';
@@ -182,7 +181,7 @@ export async function addDebtConversation(conversation, ctx) {
       );
       debtorId = debtor.id;
     }
-    const debt = await conversation.external(() =>
+    await conversation.external(() =>
       api.addDebt(tgId, { debtorId, direction, amount, dueDate, note })
     );
 

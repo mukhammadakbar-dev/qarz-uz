@@ -1,10 +1,9 @@
-import { InlineKeyboard, InputFile } from 'grammy';
+import { InlineKeyboard } from 'grammy';
 import { parseNaturalLanguage } from '../lib/ai.js';
 import { api } from '../lib/api.js';
 import { sessions } from '../lib/sessions.js';
 import { t, money } from '../lib/i18n.js';
 import { mainMenu } from '../keyboards/index.js';
-import { getRemoteConfig } from '../lib/remoteConfig.js';
 import { handleStart } from './auth.js';
 
 // Temporary memory store for pending AI debt confirmations
@@ -204,7 +203,7 @@ export const handleAiCallback = async (ctx) => {
         debtorId = newDebtor.id;
       }
 
-      const debt = await api.addDebt(tgId, {
+      await api.addDebt(tgId, {
         debtorId,
         direction: item.direction,
         amount: item.amount,
