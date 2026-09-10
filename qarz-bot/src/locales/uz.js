@@ -130,7 +130,7 @@ export default {
   // --- Reduce debt ---
   ask_reduce_debtor: 'Qaysi qarzdordan qarz o\'chirilsin?',
   ask_reduce_amount: '<b>{name}</b> (Jami qarz: {outstanding} so\'m)\n\nQancha qarz o\'chiriladi / qaytarildi? (summani kiriting):',
-  reduce_amount_invalid: 'Iltimos, to\'g'ri summa kiriting (masalan: 100000).',
-  reduce_success: '✅ <b>{name}</b> dan <b>{amount} so'm</b> qarz o\'chirildi.\n\n💰 Qolgan qarz: <b>{remaining} so'm</b>',
+  reduce_amount_invalid: 'Iltimos, to\'g\'ri summa kiriting (masalan: 100000).',
+  reduce_success: '✅ <b>{name}</b> dan <b>{amount} so\'m</b> qarz o\'chirildi.\n\n💰 Qolgan qarz: <b>{remaining} so\'m</b>',
   no_debt_to_reduce: 'Ushbu qarzdorda o\'chirish uchun ochiq qarz topilmadi.',
 };

@@ -1,6 +1,5 @@
 import { Keyboard, InlineKeyboard } from 'grammy';
 import { t } from '../lib/i18n.js';
-import { config } from '../lib/config.js';
 
 export const contactKeyboard = (lang) =>
   new Keyboard()
