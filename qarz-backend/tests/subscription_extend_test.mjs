@@ -120,6 +120,13 @@ mem.public.none(`
     VALUES ('sub-valid', 'aaaaaaaa-0000-4000-8000-000000000002', 'pro', 'active', now() + interval '20 days');
   INSERT INTO sms_balance (shop_id, monthly_limit, remaining) VALUES ('aaaaaaaa-0000-4000-8000-000000000002', 200, 150);
 
+  -- BLOCKED by moderation, and still paying. Renewing must not unblock it.
+  INSERT INTO users (id, role, phone) VALUES ('owner-4', 'shop_owner', '+998904444444');
+  INSERT INTO shops (id, owner_id, name) VALUES ('aaaaaaaa-0000-4000-8000-000000000004', 'owner-4', 'Blocked Market');
+  INSERT INTO subscriptions (id, shop_id, plan, status, ends_at)
+    VALUES ('sub-blocked', 'aaaaaaaa-0000-4000-8000-000000000004', 'pro', 'blocked', now() + interval '5 days');
+  INSERT INTO sms_balance (shop_id, monthly_limit, remaining) VALUES ('aaaaaaaa-0000-4000-8000-000000000004', 200, 200);
+
   -- NO SUBSCRIPTION ROW AT ALL (treated as expired by enforceSubscription)
   INSERT INTO shops (id, owner_id, name) VALUES ('aaaaaaaa-0000-4000-8000-000000000003', 'owner-3', 'Orphan Market');
   INSERT INTO sms_balance (shop_id, monthly_limit, remaining) VALUES ('aaaaaaaa-0000-4000-8000-000000000003', 30, 30);
@@ -309,10 +316,43 @@ P('history names the admin who recorded it', r.body[0].recorded_by_phone === '+9
 
 // ---------- Stats ----------
 console.log('--- stats ---');
+// ---------- Moderation state survives a renewal ----------
+console.log('--- blocked shop ---');
+
+// THE BUG: extend forced status = 'active', so recording a routine payment for
+// a shop that had been blocked for abuse silently lifted the block — with no
+// audit trail saying anyone had decided to. setShopActive is the moderation
+// lever; taking money is not.
+r = await extend('aaaaaaaa-0000-4000-8000-000000000004', { months: 3, amountUzs: 450000 });
+P('extending a blocked shop -> 200', r.status === 200, JSON.stringify(r.body));
+
+sub = one("SELECT * FROM subscriptions WHERE shop_id = 'aaaaaaaa-0000-4000-8000-000000000004'");
+P('the block is NOT lifted by paying', sub.status === 'blocked', sub.status);
+// The money and the period still have to be honoured — they paid for it.
+P('but the period is still extended', new Date(sub.ends_at) > new Date(Date.now() + 90 * 86400000), String(sub.ends_at));
+
+let blockedPay = one("SELECT * FROM subscription_payments WHERE shop_id = 'aaaaaaaa-0000-4000-8000-000000000004'");
+P('and the payment is recorded', Number(blockedPay.amount_uzs) === 450000, String(blockedPay?.amount_uzs));
+
+// ---------- Month-end arithmetic ----------
+console.log('--- month-end dates ---');
+
+// THE BUG: setMonth(getMonth() + n) overflows a short month — Jan 31 + 1 month
+// landed on Mar 3, handing out three free days and writing the wrong date into
+// the immutable payment record too.
+// Imported, not re-implemented: a local copy would keep passing after the real
+// one regressed, which is the one thing these assertions exist to catch.
+const { addMonths } = await import('../src/controllers/admin.controller.js');
+const iso = (d) => d.toISOString().slice(0, 10);
+P('Jan 31 + 1 month clamps to Feb 28', iso(addMonths(new Date('2026-01-31T12:00:00Z'), 1)) === '2026-02-28', iso(addMonths(new Date('2026-01-31T12:00:00Z'), 1)));
+P('and to Feb 29 in a leap year', iso(addMonths(new Date('2024-01-31T12:00:00Z'), 1)) === '2024-02-29', iso(addMonths(new Date('2024-01-31T12:00:00Z'), 1)));
+P('Aug 31 + 6 months clamps too', iso(addMonths(new Date('2026-08-31T12:00:00Z'), 6)) === '2027-02-28', iso(addMonths(new Date('2026-08-31T12:00:00Z'), 6)));
+P('an ordinary date is untouched', iso(addMonths(new Date('2026-01-15T12:00:00Z'), 1)) === '2026-02-15');
+
 r = await call('/api/admin/stats');
 P('stats -> 200', r.status === 200, `got ${r.status}`);
 P('collectedThisMonth reports money actually received',
-  r.body.collectedThisMonth === 50000 + 450000 + 50000 + 1800000 + 150000 + 0,
+  r.body.collectedThisMonth === 50000 + 450000 + 50000 + 1800000 + 150000 + 0 + 450000,
   String(r.body.collectedThisMonth));
 
 server.close();

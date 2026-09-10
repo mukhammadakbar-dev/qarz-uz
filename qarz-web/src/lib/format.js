@@ -19,6 +19,28 @@ export const fmtDate = (d) => {
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * Turn the API's signed `days_left` into the badge shown in the debtors list.
+ *
+ * The backend computes the number (negative = overdue, 0 = due today) so the
+ * browser does no date arithmetic and the badge can never disagree with the row
+ * order, which is sorted on the same figure.
+ *
+ * Returns null when there is no deadline at all — the caller renders a dash.
+ */
+export const dueLabel = (daysLeft) => {
+  if (daysLeft === null || daysLeft === undefined || daysLeft === '') return null;
+  const n = Number(daysLeft);
+  if (Number.isNaN(n)) return null;
+
+  if (n < 0) return { text: `${Math.abs(n)} kun kechikdi`, cls: 'due-over' };
+  if (n === 0) return { text: 'Bugun', cls: 'due-today' };
+  // Three days is about as far ahead as a shop owner acts on; past that it is
+  // information rather than a task, so it stops competing for attention.
+  if (n <= 3) return { text: `${n} kun qoldi`, cls: 'due-soon' };
+  return { text: `${n} kun qoldi`, cls: 'due-far' };
+};
+
 export const statusMeta = {
   open: { label: 'Ochiq', cls: 'badge-neutral' },
   partial: { label: 'Qisman', cls: 'badge-warn' },

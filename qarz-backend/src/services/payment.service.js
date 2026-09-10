@@ -8,6 +8,18 @@ import { NotFound, AppError } from '../utils/errors.js';
  * Create a one-time, expiring payment link for a debt's outstanding amount.
  */
 export const createPaymentLink = async (debtId) => {
+  // A link is only worth anything if there is a live gateway behind it. With
+  // Click unconfigured, /pay/:token answers with raw JSON and no checkout
+  // exists, so a "payment link" handed to a customer is a broken promise.
+  // Refuse to mint one rather than let callers pass it on.
+  if (!config.click.enabled) {
+    throw new AppError(
+      'Onlayn to\'lov hozircha yoqilmagan',
+      503,
+      'PAYMENT_GATEWAY_OFF'
+    );
+  }
+
   const { rows } = await query('SELECT * FROM debts WHERE id = $1', [debtId]);
   const debt = rows[0];
   if (!debt) throw NotFound('Qarz topilmadi');

@@ -12,6 +12,7 @@ import {
   broadcast,
   extendSubscription,
   listSubscriptionPayments,
+  addSmsQuota,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -40,6 +41,12 @@ router.patch(
   validate(adminSchemas.shopIdParam, 'params'),
   validate(adminSchemas.extendSubscription),
   extendSubscription
+);
+router.post(
+  '/shops/:shopId/sms',
+  validate(adminSchemas.shopIdParam, 'params'),
+  validate(adminSchemas.addSmsQuota),
+  addSmsQuota
 );
 router.get(
   '/shops/:shopId/subscription-payments',

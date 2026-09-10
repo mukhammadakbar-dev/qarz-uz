@@ -176,7 +176,7 @@ P('uzbek apostrophes accepted', uzb.success);
 const letterPhone = debtorSchemas.create.safeParse({ fullName: 'Ali Valiyev', phone: 'abcdefgh' });
 P('letters in phone rejected', !letterPhone.success);
 const noContact = debtorSchemas.create.safeParse({ fullName: 'Ali Valiyev' });
-P('no phone and no telegram rejected', !noContact.success);
+P('no phone and no telegram accepted', noContact.success);
 
 // update schema
 const upd = debtorSchemas.update.safeParse({ fullName: 'Yangi Ism' });

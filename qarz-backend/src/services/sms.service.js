@@ -26,10 +26,26 @@ const getToken = async () => {
 
 /**
  * Send an SMS. Returns { ok, id?, error? }.
- * In dev (no creds) it logs instead of failing.
+ *
+ * With no credentials the behaviour depends on the environment, and the
+ * difference matters: in development, logging the message IS the delivery —
+ * there is no provider and nobody waiting for it. In production the same branch
+ * was a lie. It reported success, so notifyDebtor marked the notification
+ * `sent`, kept the SMS credit it had already reserved, and the debtor received
+ * nothing. An unconfigured provider was indistinguishable from a working one,
+ * and a shop's monthly allowance drained on messages that never existed.
+ *
+ * Failing closed puts that right: the caller refunds the credit and records the
+ * notification as failed, which is what actually happened.
  */
 export const sendSms = async (phone, message) => {
   if (!config.eskiz.email || !config.eskiz.password) {
+    if (config.env === 'production') {
+      return {
+        ok: false,
+        error: 'SMS xizmati sozlanmagan (ESKIZ_EMAIL / ESKIZ_PASSWORD)',
+      };
+    }
     console.log(`[sms:dev] -> ${phone}: ${message}`);
     return { ok: true, id: 'dev-' + Date.now(), dev: true };
   }

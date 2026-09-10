@@ -18,14 +18,31 @@ const generateCode = () =>
   String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
 
 /**
- * Create and store a new OTP for a phone.
- * Invalidates any earlier unconsumed codes for the same phone+purpose.
- * Returns the plaintext code so the caller can send it via SMS.
+ * Create a new OTP for a phone and hand it to `deliver` for sending.
+ *
+ * The previous code is invalidated only once delivery has succeeded. It used to
+ * happen first, which quietly cost people their working code: request an SMS,
+ * receive it, then tap "Telegram orqali kod olish" — if that send failed (no
+ * Gateway balance, say) the request errored AND the SMS code they were holding
+ * had already been burned. Neither code worked, and re-requesting ran into the
+ * 5-per-hour limiter.
+ *
+ * `deliver` receives the plaintext code and must resolve to { ok } (matching
+ * sendSms / sendTelegramCode). Anything falsy — or a throw — leaves the earlier
+ * code untouched and the new one unwritten.
  */
-export const issueOtp = async (phone, purpose = 'telegram_link') => {
+export const issueOtp = async (phone, purpose = 'telegram_link', deliver = null) => {
   const code = generateCode();
   const codeHash = hashCode(phone, code);
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+  const ttlMinutes = OTP_TTL_MINUTES;
+
+  if (deliver) {
+    const result = await deliver({ code, expiresAt, ttlMinutes });
+    if (!result?.ok) {
+      return { ok: false, error: result?.error || 'Yuborib bo\'lmadi', ttlMinutes };
+    }
+  }
 
   // burn previous outstanding codes so only the newest works
   await query(
@@ -40,7 +57,7 @@ export const issueOtp = async (phone, purpose = 'telegram_link') => {
     [phone, codeHash, purpose, expiresAt]
   );
 
-  return { code, expiresAt, ttlMinutes: OTP_TTL_MINUTES };
+  return { ok: true, code, expiresAt, ttlMinutes };
 };
 
 /**

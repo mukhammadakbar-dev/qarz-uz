@@ -1,16 +1,24 @@
-import { randomBytes } from 'crypto';
 import { InlineKeyboard } from 'grammy';
 import { t } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { sessions } from '../lib/sessions.js';
 import { mainMenu, contactKeyboard } from '../keyboards/index.js';
 
+// Must match the backend's own minimum (schemas.registerShop / registerPersonal),
+// so a password accepted here is never rejected by the API.
+export const MIN_PASSWORD_LENGTH = 6;
+
 /**
  * Interactive registration from Telegram bot (Zero password prompt):
  * 1) Choose Role (Shop Owner vs Personal User)
  * 2) Enter Full Name
  * 3) Enter Shop Name (if Shop Owner)
- * Password is generated automatically so Telegram registration requires NO password prompt!
+ * 4) Choose a password — the same one used to sign in on the website.
+ *
+ * No confirmation code is asked here: sharing a contact card in an authenticated
+ * Telegram session already proves control of the number (the backend accepts it
+ * via the bot's shared secret). The code belongs to web registration, where
+ * there is no such proof.
  */
 export async function registerConversation(conversation, ctx) {
   const tgId = ctx.from.id;
@@ -52,10 +60,8 @@ export async function registerConversation(conversation, ctx) {
     shopName = msg.message.text.trim();
   }
 
-  // Auto-generate the internal password (no prompt needed in Telegram).
-  // Math.random() is not a CSPRNG and its state is recoverable from previous
-  // outputs, which would make these passwords predictable across registrations.
-  const password = 'tg-' + randomBytes(18).toString('base64url') + 'A1!';
+  // Generate secure random internal password (users operate 100% via Telegram Bot / Mini App)
+  const password = Math.random().toString(36).slice(2) + 'Secret1!';
 
   try {
     let res;

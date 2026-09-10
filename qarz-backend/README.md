@@ -64,7 +64,7 @@ Seed'dan keyin super admin: `+998900000000 / admin12345` (env orqali o'zgartirin
 | Metod | Yo'l | Tavsif |
 |---|---|---|
 | GET | `/shops?search=&plan=&status=` | Barcha do'konlar |
-| GET | `/stats` | Platforma statistikasi (MRR, shu oygi tushum, faol obunalar, SMS) |
+| GET | `/stats` | Platforma statistikasi (shu oygi tushum, faol obunalar, SMS) |
 | GET | `/plans` / PATCH `/plans/:code` | Tariflarni sozlash |
 | PATCH | `/shops/:shopId/active` | Bloklash/faollashtirish (login) |
 | PATCH | `/shops/:shopId/subscription` | Obunani qo'lda uzaytirish + to'lovni qayd etish |
@@ -274,11 +274,11 @@ TZ 4.6-band, 9-band: "Barcha do'kon egalariga tizim xabarini yuborish". Endi to'
 curl -X POST http://localhost:4000/api/admin/broadcast \
   -H "Authorization: Bearer $SUPER_ADMIN_TOKEN" \
   -d '{"message":"Ertaga 02:00-04:00 texnik ishlar bo'\''ladi"}'
-# -> {"ok":true,"totalOwners":12,"telegramSent":9,"smsSent":2,"failed":1}
+# -> {"ok":true,"announcementId":"...","totalOwners":12,"telegramSent":9,"failed":1}
 ```
-Telegram bog'langan bo'lsa Telegram orqali, aks holda SMS orqali — debtor eslatmalari bilan bir xil kanal tanlash mantig'i. Audit log'ga yoziladi. Tekshirildi: `tests/broadcast_test.mjs` (12 ta).
+E'lon avval `announcements` jadvaliga saqlanadi — shuning uchun har bir faol do'kon egasi uni saytda ko'radi, hatto Telegram ulanmagan bo'lsa ham. Telegram esa ustiga qo'shimcha push. SMS yuborilmaydi: u har bir e'lonni pullik qilar va o'qilgach yo'qolar edi. Audit log'ga yoziladi. Tekshirildi: `tests/announcements_test.mjs` (28 ta).
 
-Jami: **247 ta backend test, 0 ta xato** (`npm test`).
+Jami: **383 ta backend test, 0 ta xato** (`npm test`).
 
 ---
 

@@ -66,6 +66,13 @@ pgMod.Pool.prototype.query = async function (text, params = []) {
     return { rows: [d] };
   }
 
+  // INSERT INTO debtors
+  if (t.startsWith('INSERT INTO debtors')) {
+    const newD = { id: 'new-debtor-uuid', owner_id: params[0], shop_id: params[1], full_name: params[2], phone: params[3], telegram_id: params[4] };
+    db.debtors.push(newD);
+    return { rows: [newD] };
+  }
+
   return { rows: [] };
 };
 pgMod.Pool.prototype.connect = async function () {
@@ -131,6 +138,8 @@ P('33333333-3333-4333-8333-333333333333 name unchanged', db.debtors.find((d) => 
 const noAuth = await fetch(base + '/api/debtors/11111111-1111-4111-8111-111111111111', { method: 'DELETE' });
 P('DELETE without auth -> 401', noAuth.status === 401, `got ${noAuth.status}`);
 const noAuth2 = await fetch(base + '/api/debtors/11111111-1111-4111-8111-111111111111', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-P('PATCH without auth -> 401', noAuth2.status === 401, `got ${noAuth2.status}`);
+// 8. Create debtor with ONLY fullName (phone and telegram_id optional) -> 201
+r = await call('/api/debtors', { method: 'POST', body: { fullName: 'Faqat Ismli Mijoz' } });
+P('create debtor with only fullName -> 201', r.status === 201 && r.body.full_name === 'Faqat Ismli Mijoz', `got ${r.status} ${JSON.stringify(r.body)}`);
 
 server.close();

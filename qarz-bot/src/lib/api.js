@@ -122,14 +122,6 @@ export const api = {
       body: { phone, telegramId, otp },
     }),
 
-  // `phone` comes from a shared contact card, which is what actually proves
-  // ownership; the backend rejects the call without the bot shared secret.
-  confirmVerifyToken: (token, telegramId, phone) =>
-    publicRequest('/api/auth/telegram/confirm-verify-token', {
-      method: 'POST',
-      body: { token, telegramId, phone },
-      botSecret: true,
-    }),
 
   directLinkByContact: (phone, telegramId) =>
     publicRequest('/api/auth/telegram/direct-link', {
@@ -187,6 +179,11 @@ export const api = {
 
   paymentLink: (tgId, debtId) =>
     authRequest(tgId, `/api/debts/${debtId}/payment-link`, { method: 'POST' }),
+
+
+  // --- Public config / tariffs (no auth) ---
+  publicConfig: () => publicRequest('/api/config/public'),
+  plans: () => publicRequest('/api/config/plans'),
 
   // --- Shop ---
   dashboard: (tgId) => authRequest(tgId, '/api/shop/dashboard'),

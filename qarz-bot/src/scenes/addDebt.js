@@ -1,7 +1,8 @@
 import { InputFile, InlineKeyboard } from 'grammy';
-import { t, money } from '../lib/i18n.js';
+import { t, tPlain, money } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { sessions } from '../lib/sessions.js';
+import { getRemoteConfig } from '../lib/remoteConfig.js';
 import { cancelKeyboard, mainMenu } from '../keyboards/index.js';
 
 const isCancel = (text, lang) => text === t('cancel_btn', lang) || text === '/cancel';
@@ -100,7 +101,9 @@ export async function addDebtConversation(conversation, ctx) {
     if (Array.isArray(matches) && matches.length > 0) {
       const kb = new InlineKeyboard();
       matches.slice(0, 5).forEach((m, i) => {
-        const label = t('dup_option', lang, {
+        // Button captions are plain text, not HTML — tPlain keeps a name with
+        // "&" in it from showing up as "&amp;".
+        const label = tPlain('dup_option', lang, {
           name: m.full_name,
           phone: m.phone ? ` (${m.phone})` : '',
           outstanding: money(m.outstanding || 0),
@@ -183,40 +186,17 @@ export async function addDebtConversation(conversation, ctx) {
       api.addDebt(tgId, { debtorId, direction, amount, dueDate, note })
     );
 
-    // Try fetching PNG receipt image
-    let receiptPng;
-    try {
-      receiptPng = await conversation.external(() =>
-        api.getDebtReceiptBuffer(tgId, debt.id)
-      );
-    } catch {
-      receiptPng = null;
-    }
-
-    const kb = new InlineKeyboard()
-      .text('📲 Mijozga yuborish', `send_receipt:${debt.id}:${debtorId}`)
-      .text('💳 To\'lov linki', `pay_link:${debt.id}`);
-
     const captionText = t('debt_created', lang, {
       name: fullName,
       amount: money(amount),
       due: dueDate || '—',
     });
 
-    if (receiptPng) {
-      await ctx.replyWithPhoto(new InputFile(receiptPng, `kvitansiya-${debt.id}.png`), {
-        caption: captionText,
-        parse_mode: 'HTML',
-        reply_markup: kb,
-      });
-      // Also restore main menu keyboard for main chat
-      await ctx.reply('Bosh menyu:', { reply_markup: mainMenu(lang, sess.role) });
-    } else {
-      await ctx.reply(captionText, {
-        parse_mode: 'HTML',
-        reply_markup: mainMenu(lang, sess.role),
-      });
-    }
+    await ctx.reply(captionText, {
+      parse_mode: 'HTML',
+      reply_markup: mainMenu(lang, sess.role),
+    });
+
   } catch (err) {
     await fail(err);
   }

@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "node --import ./src/instrument.js --dns-result-order=ipv4first src/index.js",
-    "dev": "node --import ./src/instrument.js --dns-result-order=ipv4first --watch src/index.js",
+    "start": "node --import ./src/instrument.js --dns-result-order=ipv4first --no-network-family-autoselection src/index.js",
+    "dev": "node --import ./src/instrument.js --dns-result-order=ipv4first --no-network-family-autoselection --watch src/index.js",
     "test": "node tests/run-all.mjs",
     "lint": "oxlint"
   },

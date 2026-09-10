@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS users (
   phone         VARCHAR(20) UNIQUE,
   telegram_id   BIGINT UNIQUE,
   password_hash TEXT,
+  -- Anything issued before this instant is refused by /auth/refresh, so a
+  -- password change ends every other session instead of leaving 30-day refresh
+  -- tokens alive. NULL = never changed.
+  password_changed_at TIMESTAMPTZ,
   full_name     VARCHAR(120),
   -- staff belongs to a shop owner; NULL for owners/personal/super_admin
   parent_shop_id UUID,
@@ -181,12 +185,37 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_debtor ON notifications(debtor_id);
 
+-- ---------- Announcements (platform -> shop owners) ----------
+-- Stored rather than only pushed, so the web app has something to show and an
+-- owner who missed the Telegram message can still find it. See migration 009.
+CREATE TABLE IF NOT EXISTS announcements (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  body        TEXT NOT NULL,
+  target_type VARCHAR(32) NOT NULL DEFAULT 'all',
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_announcements_created ON announcements (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_announcements_target ON announcements (target_type);
+
+CREATE TABLE IF NOT EXISTS announcement_reads (
+  announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  read_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (announcement_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_announcement_reads_user ON announcement_reads (user_id);
+
 -- ---------- Reminder settings (per shop) ----------
 CREATE TABLE IF NOT EXISTS reminder_settings (
   shop_id       UUID PRIMARY KEY REFERENCES shops(id) ON DELETE CASCADE,
   days_before   INTEGER NOT NULL DEFAULT 1,    -- N kun oldin
   repeat_count  INTEGER NOT NULL DEFAULT 2,    -- necha marta
-  template      TEXT NOT NULL DEFAULT 'Hurmatli {name}, {amount} so''m qarzingiz muddati {due} da tugaydi. To''lov: {link}',
+  -- No {link} by default: the placeholder only resolves to something usable
+  -- once Click is live (see config.click.enabled). Until then it rendered an
+  -- URL that opened raw JSON for the customer. The placeholder still works —
+  -- it is simply opt-in now.
+  template      TEXT NOT NULL DEFAULT 'Hurmatli {name}, {amount} so''m qarzingiz muddati {due} da tugaydi.',
   prefer_channel notif_channel NOT NULL DEFAULT 'telegram',
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );

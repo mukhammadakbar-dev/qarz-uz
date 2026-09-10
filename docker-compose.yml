@@ -56,6 +56,10 @@ services:
       # Plaintext is fine here and only here: db is on a private compose
       # network with no published port. A managed database needs DB_SSL=true.
       DB_SSL: ${DB_SSL:-false}
+      # Only needed when the provider signs with its own root. Without this
+      # passthrough, setting DB_SSL_CA in .env had no effect inside the
+      # container and DB_SSL=true silently fell back to the system trust store.
+      DB_SSL_CA: ${DB_SSL_CA:-}
 
       # Number of proxies that APPEND to X-Forwarded-For before a request
       # reaches the app. req.ip is read that many hops from the right, and the
@@ -77,14 +81,22 @@ services:
       DEFAULT_SMS_LIMIT: ${DEFAULT_SMS_LIMIT:-30}
       PAYMENT_LINK_TTL_HOURS: ${PAYMENT_LINK_TTL_HOURS:-48}
 
+      # All three required for online payment to switch on; while any is blank
+      # the API mints no payment links and the clients hide the buttons.
       CLICK_SERVICE_ID: ${CLICK_SERVICE_ID}
       CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID}
       CLICK_SECRET_KEY: ${CLICK_SECRET_KEY}
+
+      # Where the Tariffs page sends an owner to pay for a subscription.
+      SUPPORT_TELEGRAM_USERNAME: ${SUPPORT_TELEGRAM_USERNAME}
+      SUPPORT_PHONE: ${SUPPORT_PHONE}
 
       ESKIZ_EMAIL: ${ESKIZ_EMAIL}
       ESKIZ_PASSWORD: ${ESKIZ_PASSWORD}
       ESKIZ_FROM: ${ESKIZ_FROM:-4546}
 
+      # Verification codes delivered via @VerificationCodes (gateway.telegram.org)
+      TELEGRAM_GATEWAY_TOKEN: ${TELEGRAM_GATEWAY_TOKEN}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
       BOT_SHARED_SECRET: "${BOT_SHARED_SECRET:?generate with: openssl rand -hex 24}"
@@ -114,6 +126,9 @@ services:
       # MUST equal the backend's value — it is what unlocks the session store.
       BOT_SHARED_SECRET: ${BOT_SHARED_SECRET}
       DEFAULT_LANG: ${DEFAULT_LANG:-uz}
+      # Public HTTPS URL of the web build — blank hides the "Mini-ilova" button
+      # rather than show one Telegram would reject for not being https://.
+      WEB_APP_URL: ${WEB_APP_URL:-}
       # Long polling by default: no inbound port, no TLS certificate, nothing
       # to expose. Switch to webhooks only once traffic justifies it.
       USE_WEBHOOK: ${USE_WEBHOOK:-false}

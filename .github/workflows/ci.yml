@@ -84,11 +84,14 @@ jobs:
         working-directory: qarz-web
         run: npm run lint
 
-      - name: Build
+      - name: Test
         working-directory: qarz-web
-        # There are no web tests yet, so the build IS the check: it catches
-        # missing imports and syntax errors, which is what removing a page or
-        # a component usually breaks.
+        run: npm test
+
+      - name: Build
+        # Still worth running after the tests: it catches missing imports and
+        # syntax errors in the components the unit tests never import.
+        working-directory: qarz-web
         run: npm run build
 
   # Proves the images still build. Without this, a Dockerfile can rot for weeks

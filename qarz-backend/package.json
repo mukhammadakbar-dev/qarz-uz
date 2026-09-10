@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node --import ./src/instrument.js --dns-result-order=ipv4first src/server.js",
-    "dev": "node --import ./src/instrument.js --dns-result-order=ipv4first --watch src/server.js",
+    "start": "node --import ./src/instrument.js --dns-result-order=ipv4first --no-network-family-autoselection src/server.js",
+    "dev": "node --import ./src/instrument.js --dns-result-order=ipv4first --no-network-family-autoselection --watch src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
     "reset-admin-password": "node src/db/resetAdminPassword.js",

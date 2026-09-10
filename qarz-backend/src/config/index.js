@@ -7,11 +7,19 @@ const isProd = process.env.NODE_ENV === 'production';
 /**
  * Secrets that must never fall back to a development default in production.
  * A predictable JWT or payment-link secret would let anyone mint valid tokens.
+ *
+ * BOT_SHARED_SECRET belongs here for a blunter reason: it is not a signing key
+ * but a master key. /api/bot/sessions is gated by it alone and hands back every
+ * bot user's access and refresh tokens (see botSession.controller.js), so one
+ * guessed value is one request away from every account on the platform. It was
+ * the only high-value secret this check did not cover — leaving the weakest
+ * link the one nothing verified.
  */
 const PROD_REQUIRED_SECRETS = [
   'JWT_ACCESS_SECRET',
   'JWT_REFRESH_SECRET',
   'PAYMENT_LINK_SECRET',
+  'BOT_SHARED_SECRET',
 ];
 
 /**
@@ -157,12 +165,44 @@ export const config = {
     serviceId: process.env.CLICK_SERVICE_ID || '',
     merchantId: process.env.CLICK_MERCHANT_ID || '',
     secretKey: process.env.CLICK_SECRET_KEY || '',
+    /**
+     * Is the online gateway actually live? Everything a payment link is good
+     * for — the checkout page, the Prepare/Complete callbacks — needs all three
+     * credentials, so with any of them missing a generated link is a URL that
+     * cannot take money. Handing one to a customer is worse than offering no
+     * link at all, so every link-producing path checks this first.
+     */
+    get enabled() {
+      return Boolean(this.serviceId && this.merchantId && this.secretKey);
+    },
+  },
+
+  /**
+   * Who a shop owner contacts to pay for a subscription. Until Click is
+   * integrated, renewals happen by hand: the owner messages the admin on
+   * Telegram, pays, and the admin extends the period from the Super Admin
+   * panel. Without a contact configured, the UI has nowhere to send them —
+   * so this is what makes the manual flow reachable rather than a dead end.
+   */
+  support: {
+    telegram: (process.env.SUPPORT_TELEGRAM_USERNAME || '').replace(/^@/, ''),
+    phone: process.env.SUPPORT_PHONE || '',
   },
 
   eskiz: {
     email: process.env.ESKIZ_EMAIL || '',
     password: process.env.ESKIZ_PASSWORD || '',
     from: process.env.ESKIZ_FROM || '4546',
+  },
+
+  /**
+   * Telegram Gateway (gateway.telegram.org) — delivers verification codes into
+   * the user's Telegram from the @VerificationCodes service account. Separate
+   * product from the bot, with its own token and its own paid balance, hence a
+   * separate config block.
+   */
+  telegramGateway: {
+    token: process.env.TELEGRAM_GATEWAY_TOKEN || '',
   },
 
   telegram: {

@@ -23,17 +23,11 @@ const phoneField = z
   .regex(/^[\d\s()+-]+$/, 'Telefon raqami faqat raqamlardan iborat bo\'lishi kerak');
 
 export const debtorSchemas = {
-  create: z
-    .object({
-      fullName: nameField,
-      phone: phoneField.optional(),
-      telegramId: z.number().int().optional(),
-    })
-    .refine((d) => !!d.phone || d.telegramId != null, {
-      message:
-        'Telefon raqami yoki Telegram ID dan kamida bittasi kerak — aks holda mijozga eslatma yuborib bo\'lmaydi',
-      path: ['phone'],
-    }),
+  create: z.object({
+    fullName: nameField,
+    phone: phoneField.optional(),
+    telegramId: z.number().int().optional(),
+  }),
   update: z
     .object({
       fullName: nameField.optional(),
@@ -113,18 +107,34 @@ export const listDebtors = asyncHandler(async (req, res) => {
   // number. We expose both breakdowns; `outstanding` stays as the net total
   // for backward compatibility with existing shop-owner UI and the with/no
   // debt filter above.
+  // The aggregation and the ordering are separated deliberately: sorting by a
+  // column that is grouped (d.created_at) alongside one that is aggregated
+  // (next_due_date) is legal but reads badly, and an outer ORDER BY makes both
+  // unambiguous — to a reader and to the query planner.
   const sql = `
+    SELECT * FROM (
     SELECT d.*,
            COALESCE(SUM(CASE WHEN dt.status <> 'paid' THEN dt.amount - dt.paid_amount ELSE 0 END),0) AS outstanding,
            COALESCE(SUM(CASE WHEN dt.status <> 'paid' AND dt.direction = 'given' THEN dt.amount - dt.paid_amount ELSE 0 END),0) AS outstanding_given,
            COALESCE(SUM(CASE WHEN dt.status <> 'paid' AND dt.direction = 'taken' THEN dt.amount - dt.paid_amount ELSE 0 END),0) AS outstanding_taken,
-           COUNT(dt.id) AS debt_count
+           COUNT(dt.id) AS debt_count,
+           -- The soonest deadline still outstanding. A debtor usually has more
+           -- than one debt, and the list can only show one date, so it shows the
+           -- one that runs out first — that is what the owner has to act on.
+           MIN(CASE WHEN dt.status <> 'paid' THEN dt.due_date END) AS next_due_date,
+           -- Signed, so the client needs no date arithmetic: negative = overdue
+           -- by that many days, 0 = due today. NULL when nothing has a deadline.
+           (MIN(CASE WHEN dt.status <> 'paid' THEN dt.due_date END) - CURRENT_DATE) AS days_left
     FROM debtors d
     LEFT JOIN debts dt ON dt.debtor_id = d.id
     WHERE ${clauses.join(' AND ')}
     GROUP BY d.id
     ${having}
-    ORDER BY d.created_at DESC
+    ) x
+    -- Most urgent first: the deepest overdue at the top, then whatever is due
+    -- soonest. Debtors with no deadline (and those with nothing owed) sort last
+    -- via NULLS LAST — they are not what the owner opened this page for.
+    ORDER BY x.next_due_date ASC NULLS LAST, x.created_at DESC
   `;
   const { rows } = await query(sql, params);
   res.json(rows);
@@ -173,16 +183,6 @@ export const updateDebtor = asyncHandler(async (req, res) => {
     }
   }
 
-  // Keep the "reachable by at least one channel" guarantee after the update
-  const nextPhone = has('phone') ? normPhone : current.phone;
-  const nextTelegram = has('telegramId') ? b.telegramId : current.telegram_id;
-  if (!nextPhone && nextTelegram == null) {
-    throw new AppError(
-      'Telefon raqami yoki Telegram ID dan kamida bittasi qolishi kerak',
-      422,
-      'CONTACT_REQUIRED'
-    );
-  }
 
   const sets = [];
   const params = [req.params.id, scope.value];

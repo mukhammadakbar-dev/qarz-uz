@@ -3,6 +3,7 @@ import { conversations, createConversation } from '@grammyjs/conversations';
 
 import { config } from './lib/config.js';
 import { sessions, hydrate, flush } from './lib/sessions.js';
+import { loadRemoteConfig } from './lib/remoteConfig.js';
 import { captureError, flushSentry } from './instrument.js';
 import { t } from './lib/i18n.js';
 
@@ -15,12 +16,13 @@ import {
   handleHistoryCallback,
   handlePayLinkCallback,
   handleReceiptSendCallback,
+  handleSubscription,
 } from './handlers/menu.js';
 
 import { addDebtConversation } from './scenes/addDebt.js';
 import { dailySalesConversation } from './scenes/dailySales.js';
 import { registerConversation } from './scenes/register.js';
-import { linkOtpConversation } from './scenes/linkOtp.js';
+import { handleAiMessage, handleAiCallback, handleAiGuide } from './handlers/aiHandler.js';
 
 const bot = new Bot(config.botToken);
 let webServer = null;
@@ -31,16 +33,23 @@ bot.use(conversations());
 bot.use(createConversation(addDebtConversation, 'addDebt'));
 bot.use(createConversation(dailySalesConversation, 'dailySales'));
 bot.use(createConversation(registerConversation, 'register'));
-bot.use(createConversation(linkOtpConversation, 'linkOtp'));
+// Auto-persist session for any Telegram user who interacts with the bot
+bot.use(async (ctx, next) => {
+  if (ctx.from?.id) {
+    const tgId = ctx.from.id;
+    if (!sessions.get(tgId)) {
+      sessions.set(tgId, { lang: ctx.from.language_code === 'ru' ? 'ru' : 'uz' });
+    }
+  }
+  return next();
+});
 
 // ---- Commands ----
 bot.command('start', handleStart);
+bot.command('ai', handleAiGuide);
 bot.command('register', (ctx) => ctx.conversation.enter('register'));
 bot.command('cancel', async (ctx) => {
   const lang = sessions.get(ctx.from.id)?.lang || 'uz';
-  // Leave any active conversation. Without this the command only printed
-  // "cancelled" while the conversation stayed active, so the user's next
-  // message was still swallowed by the flow they had just cancelled.
   await ctx.conversation.exit();
   await ctx.reply(t('cancelled', lang));
 });
@@ -54,6 +63,11 @@ bot.callbackQuery(/^lang:/, handleLangCallback);
 bot.callbackQuery(/^history:/, handleHistoryCallback);
 bot.callbackQuery(/^send_receipt:/, handleReceiptSendCallback);
 bot.callbackQuery(/^pay_link:/, handlePayLinkCallback);
+bot.callbackQuery(/^ai:/, handleAiCallback);
+bot.callbackQuery(/^reg:bot$/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.conversation.enter('register');
+});
 bot.callbackQuery(/^adddebt:/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.conversation.enter('addDebt');
@@ -65,21 +79,18 @@ const matches = (text, key) =>
 
 bot.on('message:text', async (ctx, next) => {
   const text = ctx.message.text;
+  if (matches(text, 'menu_ai')) return handleAiGuide(ctx);
   if (matches(text, 'menu_add_debt')) return ctx.conversation.enter('addDebt');
   if (matches(text, 'menu_debtors')) return handleDebtors(ctx);
   if (matches(text, 'menu_dashboard')) return handleDashboard(ctx);
   if (matches(text, 'menu_daily_sales')) return ctx.conversation.enter('dailySales');
+  if (matches(text, 'menu_subscription')) return handleSubscription(ctx);
   if (matches(text, 'menu_lang')) return handleLangMenu(ctx);
   return next();
 });
 
-// fallback for unauthed / unknown text
-bot.on('message:text', async (ctx) => {
-  const tgId = ctx.from.id;
-  const lang = sessions.get(tgId)?.lang || 'uz';
-  if (!sessions.isAuthed(tgId)) return handleStart(ctx);
-  await ctx.reply(t('menu_title', lang));
-});
+// fallback for unauthed / natural language AI text
+bot.on('message:text', handleAiMessage);
 
 // ---- Error handling ----
 bot.catch((err) => {
@@ -117,9 +128,15 @@ const start = async () => {
     process.exit(1);
   }
 
+  // Which payment features the backend actually has switched on. Best-effort:
+  // loadRemoteConfig never throws, and its defaults hide payment buttons rather
+  // than offer ones that cannot work.
+  await loadRemoteConfig();
+
   try {
     await bot.api.setMyCommands([
       { command: 'start', description: 'Botni ishga tushirish / Запуск' },
+      { command: 'ai', description: 'AI yordamchi yo\'riqnomasi / AI помощник' },
       { command: 'menu', description: 'Asosiy menyu / Меню' },
       { command: 'register', description: 'Ro\'yxatdan o\'tish / Регистрация' },
       { command: 'cancel', description: 'Bekor qilish / Отмена' },

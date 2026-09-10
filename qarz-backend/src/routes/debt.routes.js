@@ -15,6 +15,8 @@ import {
   addDebt,
   debtorHistory,
   payDebt,
+  editDebt,
+  removeDebt,
   generateLink,
   getDebtReceipt,
 } from '../controllers/debt.controller.js';
@@ -41,6 +43,18 @@ router.get('/debtors/:debtorId/debts', uuidDebtorId, debtorHistory);
 // --- Debts ---
 router.post('/debts', enforceSubscription, validate(debtSchemas.create), addDebt);
 router.get('/debts/:id/receipt', uuidId, getDebtReceipt);
+router.patch('/debts/:id', uuidId, enforceSubscription, validate(debtSchemas.update), editDebt);
+// Deleting is the one irreversible action on a debt, so it stays with the
+// person who carries the loss: the shop owner, or a personal user in their own
+// ledger. Staff can still correct a mistyped amount with PATCH above, which
+// leaves the record — and its payment history — intact.
+router.delete(
+  '/debts/:id',
+  uuidId,
+  authorize('shop_owner', 'personal'),
+  enforceSubscription,
+  removeDebt
+);
 router.post('/debts/:id/payments', uuidId, enforceSubscription, validate(debtSchemas.pay), payDebt);
 router.post('/debts/:id/payment-link', uuidId, enforceSubscription, generateLink);
 

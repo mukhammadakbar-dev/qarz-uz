@@ -9,6 +9,11 @@ import {
   dashboard,
 } from '../controllers/sales.controller.js';
 import {
+  announcementSchemas,
+  listAnnouncements,
+  markAnnouncementRead,
+} from '../controllers/announcement.controller.js';
+import {
   staffSchemas,
   createStaff,
   listStaff,
@@ -24,6 +29,18 @@ router.use(authenticate, authorize('shop_owner', 'staff'));
 router.post('/daily-sales', enforceSubscription, validate(salesSchemas.upsert), upsertDailySales);
 router.get('/daily-sales', validate(salesSchemas.range, 'query'), salesRange);
 router.get('/dashboard', dashboard);
+
+// --- Platform announcements ---
+// Reads only, and no subscription gate: an owner whose subscription lapsed is
+// exactly who most needs to see a notice from us. Owner-only, matching the
+// broadcast's audience — staff are not who the platform is writing to.
+router.get('/announcements', authorize('shop_owner'), listAnnouncements);
+router.post(
+  '/announcements/:id/read',
+  authorize('shop_owner'),
+  validate(announcementSchemas.idParam, 'params'),
+  markAnnouncementRead
+);
 
 // --- Staff management (owner only) ---
 router.post(

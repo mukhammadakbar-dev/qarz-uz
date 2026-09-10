@@ -94,6 +94,102 @@ export const recordPayment = async ({ debtId, amount, method, transactionId }) =
   });
 };
 
+/**
+ * Correct a debt that was entered wrongly.
+ *
+ * Until this existed a mistyped amount was permanent: there was no PATCH and no
+ * DELETE, so the only way to "fix" a wrong entry was to record a payment that
+ * never happened — which then corrupted the payment ledger as well.
+ *
+ * The daily_sales rollup has to move with the amount. createDebt adds the debt
+ * to that day's `debt_given`, and nothing subtracted it again, so every
+ * correction would have left the shop's turnover reporting permanently wrong.
+ */
+export const updateDebt = async ({ debtId, amount, dueDate, note }) => {
+  return withTransaction(async (client) => {
+    const { rows } = await client.query('SELECT * FROM debts WHERE id = $1 FOR UPDATE', [debtId]);
+    const debt = rows[0];
+    if (!debt) throw NotFound('Qarz topilmadi');
+
+    const newAmount = amount === undefined ? Number(debt.amount) : Number(amount);
+    const paid = Number(debt.paid_amount);
+
+    // Lowering a debt below what has already been paid would mean the customer
+    // overpaid a debt that never existed at that size; there is no sane way to
+    // represent that, so refuse rather than silently clamp.
+    if (newAmount < paid - 0.001) {
+      throw new AppError(
+        `Summani ${paid.toLocaleString('ru-RU')} so'mdan past qilib bo'lmaydi — shuncha to'lov qabul qilingan.`,
+        422,
+        'BELOW_PAID'
+      );
+    }
+
+    const newDue = dueDate === undefined ? debt.due_date : (dueDate || null);
+    const newNote = note === undefined ? debt.note : (note || null);
+    const status = computeStatus(newAmount, paid, newDue);
+
+    const upd = await client.query(
+      `UPDATE debts SET amount = $1, due_date = $2, note = $3, status = $4, updated_at = now()
+       WHERE id = $5 RETURNING *`,
+      [newAmount, newDue, newNote, status, debtId]
+    );
+
+    await adjustDailySales(client, debt, newAmount - Number(debt.amount));
+    return upd.rows[0];
+  });
+};
+
+/**
+ * Remove a debt entered by mistake.
+ *
+ * Refused once any payment has been recorded against it: those rows would be
+ * cascade-deleted with the debt, erasing money that really did change hands.
+ * Correcting the amount is the right move there, not deletion.
+ */
+export const deleteDebt = async (debtId) => {
+  return withTransaction(async (client) => {
+    const { rows } = await client.query('SELECT * FROM debts WHERE id = $1 FOR UPDATE', [debtId]);
+    const debt = rows[0];
+    if (!debt) throw NotFound('Qarz topilmadi');
+
+    const paid = await client.query(
+      'SELECT COUNT(*)::int AS c FROM payments WHERE debt_id = $1',
+      [debtId]
+    );
+    if (paid.rows[0].c > 0) {
+      throw new AppError(
+        'Bu qarzga to\'lov qayd etilgan — o\'chirib bo\'lmaydi. Summani to\'g\'rilang.',
+        409,
+        'HAS_PAYMENTS'
+      );
+    }
+
+    await adjustDailySales(client, debt, -Number(debt.amount));
+    await client.query('DELETE FROM debts WHERE id = $1', [debtId]);
+    return { ok: true };
+  });
+};
+
+/**
+ * Move a shop's daily_sales rollup by `delta` for the day the debt was issued.
+ *
+ * Only 'given' debts for a shop ever entered that rollup (see createDebt), so
+ * only those may leave it. GREATEST(...,0) keeps the row from going negative if
+ * the underlying rows were ever edited out from under us.
+ */
+const adjustDailySales = async (client, debt, delta) => {
+  if (!delta || !debt.shop_id || debt.direction !== 'given') return;
+  await client.query(
+    `UPDATE daily_sales
+     SET debt_given = GREATEST(debt_given + $3, 0),
+         total      = cash_card + GREATEST(debt_given + $3, 0),
+         updated_at = now()
+     WHERE shop_id = $1 AND sale_date = $2`,
+    [debt.shop_id, debt.issued_at, delta]
+  );
+};
+
 export const listDebtsForDebtor = async (debtorId) => {
   const { rows } = await query(
     'SELECT * FROM debts WHERE debtor_id = $1 ORDER BY created_at DESC',

@@ -43,4 +43,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # --import loads Sentry before any application module: it patches http, express
 # and pg at load time, so anything imported earlier stays uninstrumented. With
 # no SENTRY_DSN set, instrument.js does nothing.
-CMD ["node", "--import", "./src/instrument.js", "--dns-result-order=ipv4first", "src/server.js"]
+# --no-network-family-autoselection: on an IPv4-only host, Node's happy-eyeballs
+# tries a service's AAAA record first and reports ETIMEDOUT rather than falling
+# back to IPv4 — which silently breaks outbound Telegram and SMS delivery while
+# curl on the same host works fine. See qarz-bot/Dockerfile for the full note.
+CMD ["node", "--import", "./src/instrument.js", "--dns-result-order=ipv4first", "--no-network-family-autoselection", "src/server.js"]

@@ -33,8 +33,10 @@ export const enforceSubscription = async (req, _res, next) => {
       new Date(sub.ends_at) < new Date();
 
     if (expired) {
+      // Name where to go, not just what went wrong: renewals are manual, so an
+      // owner who is only told "renew your plan" has nowhere to click.
       throw new AppError(
-        'Obuna muddati tugagan. Yozish uchun tarifni yangilang.',
+        'Obuna muddati tugagan. Yozish uchun "Tariflar" bo\'limidan obunani yangilang.',
         403,
         'SUBSCRIPTION_EXPIRED'
       );

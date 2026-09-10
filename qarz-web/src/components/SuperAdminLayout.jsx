@@ -2,12 +2,13 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import { useTheme } from '../lib/theme.jsx';
 import { Sun, Moon } from './icons.jsx';
-import './Layout.css';
 import './SuperAdminLayout.css';
 
 const nav = [
-  { to: '/super-admin', label: "Do'konlar", end: true, icon: ShopIcon },
+  { to: '/super-admin', label: 'Boshqaruv Paneli', end: true, icon: HomeIcon },
+  { to: '/super-admin/shops', label: "Do'konlar", icon: ShopIcon },
   { to: '/super-admin/plans', label: 'Tariflar', icon: TagIcon },
+  { to: '/super-admin/broadcast', label: "E'lonlar (Broadcast)", icon: BroadcastIcon },
   { to: '/super-admin/audit-log', label: 'Faoliyat jurnali', icon: LogIcon },
 ];
 
@@ -25,8 +26,8 @@ export default function SuperAdminLayout({ children }) {
     <div className="layout sa-layout">
       <aside className="sidebar sa-sidebar">
         <div className="brand">
-          <span className="brand-mark sa-mark">SA</span>
-          <span className="brand-name">Super<span className="brand-dim">Admin</span></span>
+          <span className="brand-mark sa-mark">TD</span>
+          <span className="brand-name">Temir<span className="brand-dim">Daftar</span></span>
         </div>
 
         <nav className="nav">
@@ -66,6 +67,15 @@ export default function SuperAdminLayout({ children }) {
   );
 }
 
+function HomeIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="9 22 9 12 15 12 15 22" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function ShopIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -79,6 +89,14 @@ function TagIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M20 12 12.6 4.6a2 2 0 0 0-1.4-.6H5a1 1 0 0 0-1 1v6.2c0 .5.2 1 .6 1.4L12 20l8-8Z" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="7.5" cy="7.5" r="1.2" />
+    </svg>
+  );
+}
+function BroadcastIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M22 2L11 13" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M22 2L15 22L11 13L2 9L22 2Z" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }

@@ -3,7 +3,6 @@ import { api } from '../lib/api.js';
 import { som, grp, fmtDate } from '../lib/format.js';
 import { useToast } from '../components/Toast.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import BroadcastCard from '../components/BroadcastCard.jsx';
 import ExtendSubscriptionModal from '../components/ExtendSubscriptionModal.jsx';
 import './SuperAdminShops.css';
 
@@ -14,6 +13,63 @@ const STATUS_LABEL = {
   blocked: { label: 'Bloklangan', cls: 'badge-danger' },
 };
 
+function AddSmsModal({ shop, onClose, onDone }) {
+  const [amount, setAmount] = useState('50');
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const val = parseInt(amount, 10);
+    if (!val || val <= 0) {
+      toast('SMS sonini to\'g\'ri kiriting', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.adminAddSmsQuota(shop.id, val);
+      toast(`✅ ${shop.name} do'koniga ${val} ta SMS qo'shildi`);
+      onDone();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '24px' }}>
+        <h3>SMS Paket Qo'shish</h3>
+        <p className="muted" style={{ fontSize: '13px', marginBottom: '16px' }}>
+          <b>{shop.name}</b> do'koniga bonus SMS limiti berish
+        </p>
+
+        <form onSubmit={submit}>
+          <div className="field" style={{ marginBottom: '16px' }}>
+            <label>SMS soni</label>
+            <input
+              type="number"
+              className="input"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              min="1"
+              required
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>Bekor qilish</button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? 'Qo\'shilmoqda...' : 'SMS Qo\'shish'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminShops() {
   const toast = useToast();
   const [stats, setStats] = useState(null);
@@ -22,10 +78,8 @@ export default function SuperAdminShops() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [busyId, setBusyId] = useState(null);
-  // Which shop's subscription dialog is open, if any.
   const [extending, setExtending] = useState(null);
-  // Plan prices, so the dialog can suggest an amount. Fetched once — they
-  // change rarely, and refetching per dialog would flash an empty suggestion.
+  const [addingSms, setAddingSms] = useState(null);
   const [plans, setPlans] = useState([]);
 
   const load = useCallback(async () => {
@@ -51,8 +105,6 @@ export default function SuperAdminShops() {
   }, [load, search]);
 
   useEffect(() => {
-    // Prices only drive a suggestion the admin can override, so a failure here
-    // degrades to an empty field rather than blocking the page.
     api.adminPlans().then((p) => setPlans(Array.isArray(p) ? p : [])).catch(() => setPlans([]));
   }, []);
 
@@ -71,17 +123,14 @@ export default function SuperAdminShops() {
 
   return (
     <>
-      <PageHeader title="Do'konlar" subtitle="Platformadagi barcha do'konlar va obunalar" />
+      <PageHeader title="Do'konlar & Foydalanuvchilar" subtitle="Platformadagi barcha do'konlar va ularning obuna/SMS holati" />
 
       <div className="stat-grid sa-stat-grid">
         <MiniStat label="Jami do'konlar" value={stats ? grp(stats.totalShops) : '—'} />
         <MiniStat label="Faol obunalar" value={stats ? grp(stats.activeSubscriptions) : '—'} />
         <MiniStat label="SMS (shu oy)" value={stats ? grp(stats.smsThisMonth) : '—'} />
-        <MiniStat label="Oylik daromad" value={stats ? som(stats.monthlyRecurringRevenue) : '—'} />
-        <MiniStat label="Tushum (shu oy)" value={stats ? som(stats.collectedThisMonth) : '—'} />
+        <MiniStat label="Bu oy tushdi" value={stats ? som(stats.collectedThisMonth) : '—'} />
       </div>
-
-      <BroadcastCard />
 
       <div className="toolbar card">
         <div className="search-box">
@@ -94,7 +143,7 @@ export default function SuperAdminShops() {
           />
         </div>
         <div className="seg">
-          {[['', 'Hammasi'], ['trial', 'Sinov'], ['active', 'Faol'], ['expired', 'Tugagan']].map(([k, l]) => (
+          {[['', 'Hammasi'], ['trial', 'Sinov'], ['active', 'Faol'], ['expired', 'Tugagan'], ['blocked', 'Bloklangan']].map(([k, l]) => (
             <button key={k} className={`seg-btn ${status === k ? 'active' : ''}`} onClick={() => setStatus(k)}>
               {l}
             </button>
@@ -118,8 +167,9 @@ export default function SuperAdminShops() {
                 <th>Tarif</th>
                 <th>Holat</th>
                 <th>Muddati</th>
-                <th style={{ textAlign: 'right' }}>SMS</th>
-                <th>Amal</th>
+                <th>Qarzdorlar / Qarz</th>
+                <th style={{ textAlign: 'right' }}>SMS Balans</th>
+                <th>Amallar</th>
               </tr>
             </thead>
             <tbody>
@@ -132,11 +182,17 @@ export default function SuperAdminShops() {
                     <td className="muted">{s.plan || '—'}</td>
                     <td><span className={`badge ${meta.cls}`}>{meta.label}</span></td>
                     <td className="muted small">{s.ends_at ? fmtDate(s.ends_at) : '—'}</td>
+                    <td className="muted small">
+                      {grp(s.debtor_count || 0)} ta / {som(s.total_outstanding || 0)}
+                    </td>
                     <td style={{ textAlign: 'right' }} className="num muted">{grp(s.sms_remaining ?? 0)}</td>
                     <td>
-                      <div className="sa-actions">
+                      <div className="sa-actions" style={{ display: 'flex', gap: '6px' }}>
                         <button className="btn btn-mini" onClick={() => setExtending(s)}>
                           Uzaytirish
+                        </button>
+                        <button className="btn btn-mini btn-outline" onClick={() => setAddingSms(s)}>
+                          +SMS
                         </button>
                         <button
                           className={`btn btn-mini ${s.is_active ? 'btn-mini-danger' : ''}`}
@@ -161,6 +217,14 @@ export default function SuperAdminShops() {
           plans={plans}
           onClose={() => setExtending(null)}
           onDone={() => { setExtending(null); load(); }}
+        />
+      )}
+
+      {addingSms && (
+        <AddSmsModal
+          shop={addingSms}
+          onClose={() => setAddingSms(null)}
+          onDone={() => { setAddingSms(null); load(); }}
         />
       )}
     </>

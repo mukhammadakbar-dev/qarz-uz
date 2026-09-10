@@ -5,10 +5,13 @@ import {
   createDebt,
   recordPayment,
   listDebtsForDebtor,
+  updateDebt,
+  deleteDebt,
 } from '../services/debt.service.js';
 import { createPaymentLink } from '../services/payment.service.js';
 import { generateReceiptPng } from '../services/receiptService.js';
 import { isoDate, uuid, money } from '../utils/validators.js';
+import { logAction } from '../utils/audit.js';
 
 export const debtSchemas = {
   create: z.object({
@@ -24,6 +27,19 @@ export const debtSchemas = {
     method: z.enum(['cash', 'click', 'payme', 'manual']).optional(),
     transactionId: z.string().max(120).optional(),
   }),
+  // Correcting a mistyped entry. debtorId and direction are deliberately not
+  // editable: moving a debt to another customer or flipping its direction is a
+  // different record, not a correction, and would need the daily_sales rollup
+  // unwound on one side and applied on the other.
+  update: z
+    .object({
+      amount: money.optional(),
+      note: z.string().max(2000).nullable().optional(),
+      dueDate: isoDate.nullable().optional(),
+    })
+    .refine((d) => Object.keys(d).length > 0, {
+      message: 'O\'zgartirish uchun kamida bitta maydon kerak',
+    }),
   idParam: z.object({ id: uuid }),
   debtorIdParam: z.object({ debtorId: uuid }),
 };
@@ -86,6 +102,39 @@ export const payDebt = asyncHandler(async (req, res) => {
     transactionId: req.body.transactionId,
   });
   res.json(debt);
+});
+
+export const editDebt = asyncHandler(async (req, res) => {
+  const { user } = req;
+  await assertDebtAccess(user, req.params.id);
+  const debt = await updateDebt({
+    debtId: req.params.id,
+    amount: req.body.amount,
+    note: req.body.note,
+    dueDate: req.body.dueDate,
+  });
+  res.json(debt);
+});
+
+export const removeDebt = asyncHandler(async (req, res) => {
+  const { user } = req;
+  const debt = await assertDebtAccess(user, req.params.id);
+  const result = await deleteDebt(req.params.id);
+
+  // The row is gone for good, so the log is the only thing left saying it ever
+  // existed. Record enough to re-enter it by hand, and who removed it.
+  await logAction(user.id, 'delete_debt', {
+    debtId: debt.id,
+    debtorId: debt.debtor_id,
+    shopId: debt.shop_id,
+    amount: debt.amount,
+    direction: debt.direction,
+    issuedAt: debt.issued_at,
+    dueDate: debt.due_date,
+    note: debt.note,
+  });
+
+  res.json(result);
 });
 
 export const generateLink = asyncHandler(async (req, res) => {

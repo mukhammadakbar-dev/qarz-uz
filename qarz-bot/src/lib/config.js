@@ -8,6 +8,12 @@ export const config = {
   // Must match BOT_SHARED_SECRET on the backend. Lets this bot register users
   // without a second SMS OTP, since sharing a contact already proves ownership.
   botSharedSecret: process.env.BOT_SHARED_SECRET || '',
+  /**
+   * Where the "📲 Mini-ilova" button opens. Telegram only accepts HTTPS here —
+   * a plain-http dev URL is silently rejected by the client, so this stays
+   * unset (and the button hidden) until a real public URL exists.
+   */
+  webAppUrl: process.env.WEB_APP_URL || '',
   // optional: run with webhooks instead of long polling
   useWebhook: process.env.USE_WEBHOOK === 'true',
   webhookUrl: process.env.WEBHOOK_URL || '',
@@ -18,6 +24,8 @@ export const config = {
    */
   webhookSecret: process.env.WEBHOOK_SECRET || '',
   port: parseInt(process.env.PORT || '3001', 10),
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
 };
 
 if (!config.botToken) {

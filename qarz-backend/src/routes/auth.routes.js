@@ -1,18 +1,23 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate.js';
+import { authenticate } from '../middleware/auth.js';
 import {
   schemas,
   registerShopCtrl,
   registerPersonalCtrl,
   loginCtrl,
+  changePasswordCtrl,
   requestRegisterOtpCtrl,
   requestTelegramLinkCtrl,
   confirmTelegramLinkCtrl,
   refreshCtrl,
-  getVerifyStatusCtrl,
-  confirmVerifyTokenCtrl,
   directLinkByContactCtrl,
+  webRegisterCodeCtrl,
+  loginTelegramWebAppCtrl,
+  requestPasswordResetCtrl,
+  resetPasswordCtrl,
+  webResetCodeCtrl,
 } from '../controllers/auth.controller.js';
 import { normalizePhone } from '../utils/phone.js';
 
@@ -82,19 +87,56 @@ router.post('/telegram/link', (_req, res) => {
 
 router.post('/refresh', validate(schemas.refresh), refreshCtrl);
 
-// --- Telegram registration handshake ---
-// Polled by the registration page; returns only a boolean, never the proof.
-router.get(
-  '/verify-status/:token',
-  validate(schemas.verifyStatusParam, 'params'),
-  getVerifyStatusCtrl
+// Set/change own password. Authenticated: this is the account holder acting on
+// their own account, not a recovery flow.
+router.patch(
+  '/password',
+  authenticate,
+  validate(schemas.changePassword),
+  changePasswordCtrl
 );
-// Bot-only (shared secret enforced in the controller).
+
+// --- Forgot password (public, proven with a bot-delivered OTP) ---
+// Same limiters as registration: the request side is an OTP send in all but
+// name, and the reset side is an OTP verify (per-code attempts capped at 5 in
+// the OTP service on top of this).
 router.post(
-  '/telegram/confirm-verify-token',
-  validate(schemas.confirmVerifyToken),
-  confirmVerifyTokenCtrl
+  '/password/request-reset',
+  otpRequestLimiter,
+  validate(schemas.requestPasswordReset),
+  requestPasswordResetCtrl
 );
+router.post(
+  '/password/reset',
+  otpConfirmLimiter,
+  validate(schemas.resetPassword),
+  resetPasswordCtrl
+);
+// Bot-only (shared secret enforced in the controller): the reset code the bot
+// reads out to someone who asked for one on the website.
+router.post(
+  '/telegram/web-reset-code',
+  validate(schemas.webRegisterCode),
+  webResetCodeCtrl
+);
+
+// Bot-only (shared secret enforced in the controller): the code the bot shows
+// to someone registering on the website.
+router.post(
+  '/telegram/web-code',
+  validate(schemas.webRegisterCode),
+  webRegisterCodeCtrl
+);
+
+// Mini App launch auth. Sits under the blanket /api/auth rate limit like
+// every other route here; no phone in the body to key a finer limiter on,
+// and the signature check is itself the gate.
+router.post(
+  '/telegram/webapp',
+  validate(schemas.telegramWebApp),
+  loginTelegramWebAppCtrl
+);
+
 router.post(
   '/telegram/direct-link',
   validate(schemas.directLink),

@@ -59,16 +59,70 @@ yoki funksiya jim turib ishlamaydi):
 | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `PAYMENT_LINK_SECRET` | har biri alohida: `openssl rand -hex 32` |
 | `BOT_SHARED_SECRET` | `openssl rand -hex 24` — backend va bot uchun **bir xil** |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` | @BotFather |
-| `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID`, `CLICK_SECRET_KEY` | Click merchant kabinet |
-| `ESKIZ_EMAIL`, `ESKIZ_PASSWORD` | Eskiz.uz kabinet |
+| `SUPPORT_TELEGRAM_USERNAME` | obuna to'lovi uchun admin Telegram username'i (@ siz) |
+| `TELEGRAM_GATEWAY_TOKEN`, `ESKIZ_*` | ixtiyoriy — pullik kanallar, pastga qarang |
 | `PUBLIC_BASE_URL`, `CORS_ORIGINS` | o'z domeningiz |
 | `SUPER_ADMIN_PHONE`, `SUPER_ADMIN_PASSWORD` | parol kamida 12 belgi |
 
-> `CORS_ORIGINS` bo'sh qolsa — istalgan sayt API'ni foydalanuvchi tokeni bilan
-> boshqara oladi. `ESKIZ_*` bo'sh qolsa — SMS **yuborilmaydi**, backend faqat
-> logga yozib "muvaffaqiyatli" deb qaytaradi.
+> ### Tasdiqlash kanallari
+>
+> Saytda yangi do'kon ochish uchun 6 xonali kod kerak. Uchta yo'l bor:
+>
+> - **🤖 Bot orqali (bepul, qo'shimcha sozlamasiz ishlaydi).** Foydalanuvchi
+>   botga raqamini ulashadi, bot unga kodni ko'rsatadi, u saytga kiritadi.
+>   Raqam Telegram kontakti bilan tasdiqlanadi. Faqat `TELEGRAM_BOT_TOKEN`
+>   kerak, u allaqachon majburiy.
+> - **✈️ Telegram Gateway (pullik).** Kod `@VerificationCodes` dan keladi,
+>   foydalanuvchi saytdan chiqmaydi. `gateway.telegram.org` da token oling va
+>   **balansni to'ldiring** — balans nol bo'lsa `BALANCE_NOT_ENOUGH` qaytadi.
+> - **📩 Eskiz.uz SMS (pullik).** `ESKIZ_EMAIL` / `ESKIZ_PASSWORD`.
+>
+> Ikki pullik kanal sozlanmagan bo'lsa ham sayt ishlaydi — bot kanali qoladi.
+>
+> `ESKIZ_*` qarzdorlarga **eslatma** yuborish uchun alohida kerak. U bo'sh
+> bo'lsa, productionda eslatmalar `failed` deb belgilanadi va SMS krediti
+> sarflanmaydi (developmentda esa logga yoziladi).
 
-## 3. Ishga tushirish
+> `CORS_ORIGINS` bo'sh qolsa — istalgan sayt API'ni foydalanuvchi tokeni bilan
+> boshqara oladi. `SUPPORT_TELEGRAM_USERNAME` bo'sh qolsa — "Tariflar" sahifasi
+> va botdagi "Obuna" bo'limi tariflarni ko'rsatadi, lekin obunani yangilash
+> uchun murojaat qiladigan hech kim bo'lmaydi.
+
+`CLICK_*` **majburiy emas** — onlayn to'lov hozircha yoqilmagan, obunalar qo'lda
+faollashtiriladi (6-bo'limga qarang).
+
+## 3. Deploy oldidan tekshiruv ro'yxati
+
+`.env` to'ldirilgach, ishga tushirishdan **oldin**:
+
+```bash
+# 1. Hech qanday example qiymat qolmaganini tekshiring
+grep -nE '^(JWT_|PAYMENT_LINK_|BOT_SHARED_|DB_PASSWORD|SUPER_ADMIN_PASSWORD)' .env
+```
+
+- [ ] `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `PAYMENT_LINK_SECRET` — uchtasi
+      **har xil**, har biri `openssl rand -hex 32` bilan yangi yaratilgan
+- [ ] `BOT_SHARED_SECRET` — tasodifiy (`openssl rand -hex 24`), **backend va
+      botda bir xil**. Bu kalit `/api/bot/sessions` ni ochadi, ya'ni undan
+      barcha foydalanuvchilarning tokenlarini o'qish mumkin — taxmin qilinadigan
+      qiymat qo'ymang. Backend uzunligini tekshiradi, taxmin qilinishini emas.
+- [ ] `SUPER_ADMIN_PASSWORD` — kamida 12 belgi (seed skripti qisqasini rad etadi)
+- [ ] `CORS_ORIGINS` — to'ldirilgan (bo'sh qolsa istalgan sayt API'ga kira oladi)
+- [ ] `PUBLIC_BASE_URL` — haqiqiy `https://` domen
+- [ ] `TRUST_PROXY` — sxemangizga mos (host nginx + web konteyner = `2`)
+- [ ] Tasdiqlash: bot kanali sozlamasiz ishlaydi. Pullik kanallarni
+      xohlasangiz — `TELEGRAM_GATEWAY_TOKEN` (balansi to'ldirilgan) yoki `ESKIZ_*`
+- [ ] `SUPPORT_TELEGRAM_USERNAME` — obuna to'lovi shu odamga boradi
+
+Ishga tushirgandan **keyin**:
+
+- [ ] `curl localhost:8080/health/ready` → `200`
+- [ ] `docker compose logs bot` → `@<bot> running ✔`
+- [ ] Super admin bilan saytga kirish
+- [ ] Yangi raqam bilan ro'yxatdan o'tib ko'rish (kod kelishini tekshirish)
+- [ ] Botda `/start` → kontakt ulash → menyu chiqishi
+
+## 4. Ishga tushirish
 
 ```bash
 docker compose up -d --build
@@ -85,7 +139,7 @@ curl -i localhost:8080/health/ready # 200 = DB ham tayyor, 503 = DB yo'q
 docker compose logs -f bot          # "@<bot> running ✔" va hydrated N session(s)
 ```
 
-## 4. TLS
+## 5. TLS
 
 ```bash
 sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/qarz
@@ -103,13 +157,60 @@ sudo certbot --nginx -d SIZNING-DOMEN.uz -d www.SIZNING-DOMEN.uz
 Noto'g'ri past qiymat — hamma foydalanuvchi bitta limit chelagini bo'lishadi;
 noto'g'ri baland qiymat — mijoz o'z IP sini soxtalashtirib limitdan o'tadi.
 
-## 5. Click webhook
+## 5b. Telegram Mini App
 
-Click kabinetida callback URL sifatida `{PUBLIC_BASE_URL}/webhooks/click/*`
-ni ro'yxatdan o'tkazing. Imzo `CLICK_SECRET_KEY` bilan tekshiriladi — kalit
-noto'g'ri bo'lsa callback'lar rad etiladi (jim qabul qilinmaydi).
+Veb-ilovaning o'zi Telegram bot ichida "Mini-ilova" sifatida ham ochiladi —
+foydalanuvchi botni tark etmasdan, parolsiz kiradi (agar Telegramini botga
+avval ulagan bo'lsa). Bu **qo'shimcha** kirish yo'li — telefon+parol orqali
+kirish o'zgarishsiz qoladi va Telegram akkaunt yo'qolganda yagona najot bo'lib
+qoladi.
 
-## 6. Zaxira nusxa
+Yoqish uchun ikkita qadam:
+
+1. `.env` da bot uchun **`WEB_APP_URL`** ni saytning haqiqiy `https://` manziliga
+   o'rnating (`PUBLIC_BASE_URL` bilan bir xil bo'lishi mumkin). **Telegram
+   `http://` manzilni butunlay rad etadi** — bo'sh qoldirilsa "📲 Mini-ilova"
+   tugmasi botda shunchaki ko'rinmaydi, xato chiqmaydi.
+2. Boshqa hech narsa kerak emas — autentifikatsiya `TELEGRAM_BOT_TOKEN` orqali
+   ishlaydi, u allaqachon majburiy.
+
+**Muhim cheklov:** Mini-ilova faqat botda **avval ulangan** (kontakt ulashgan)
+Telegram akkauntlarga ishlaydi. Birinchi marta ochgan odam — hisobi yo'q odam
+emas, balki "hali botda `/start` bosmagan" odam — "Botda /start yuboring" degan
+xabar ko'radi. Bu ataylab shunday: Mini-ilova ochilishi faqat Telegram
+foydalanuvchi ID'sini beradi, telefon raqamini emas, shuning uchun yangi
+ro'yxatdan o'tish hamon botning o'zida (kontakt ulashish orqali) bo'ladi.
+
+## 6. Obuna to'lovi (qo'lda)
+
+Onlayn to'lov keyinroqqa qoldirilgan, shuning uchun obunalar admin orqali
+faollashtiriladi:
+
+1. Do'kon egasi "Tariflar" sahifasidan yoki botdagi "💳 Obuna" bo'limidan
+   `SUPPORT_TELEGRAM_USERNAME` ga tayyor xabar bilan yozadi (xabarda uning
+   telefon raqami bo'ladi — admin do'konni shu bo'yicha topadi).
+2. Admin to'lovni qabul qiladi.
+3. Admin Super Admin panelidagi **Do'konlar → Uzaytirish** oynasidan tarif,
+   muddat va summani kiritadi. Obuna darhol faollashadi, to'lov
+   `subscription_payments` jadvaliga tushadi va daromad hisobotida ko'rinadi.
+
+## 7. Click webhook (yoqilganda)
+
+`CLICK_*` bo'sh ekan — backend to'lov havolasini **umuman yaratmaydi** (503
+`PAYMENT_GATEWAY_OFF`), web va bot esa tegishli tugmalarni ko'rsatmaydi. Sababi:
+`/pay/:token` — bu JSON qaytaradigan API endpoint, checkout sahifasi yo'q, ya'ni
+mijozga berilgan havola hech qanday to'lovni qabul qila olmaydi.
+
+Yoqish uchun: uchala `CLICK_*` qiymatini to'ldiring va Click kabinetida callback
+URL sifatida `{PUBLIC_BASE_URL}/webhooks/click/*` ni ro'yxatdan o'tkazing. Imzo
+`CLICK_SECRET_KEY` bilan tekshiriladi — kalit noto'g'ri bo'lsa callback'lar rad
+etiladi (jim qabul qilinmaydi).
+
+Eslatma shablonidagi `{link}` ham shundan keyingina ma'noga ega bo'ladi:
+migratsiya 007 uni standart shablonlardan olib tashlagan, xohlasangiz Click
+yoqilgach qo'lda qaytarasiz.
+
+## 8. Zaxira nusxa
 
 ```bash
 crontab -e
@@ -126,7 +227,7 @@ Tiklashni yiliga bir marta sinab ko'ring — sinalmagan zaxira bu taxmin:
 gunzip -c backups/qarz-YYYY-MM-DD-HHMM.sql.gz | docker compose exec -T db psql -U qarz -d qarz
 ```
 
-## 7. Xatolik monitoringi (Sentry)
+## 9. Xatolik monitoringi (Sentry)
 
 Ixtiyoriy, lekin birinchi haqiqiy foydalanuvchilardan oldin yoqishni tavsiya
 qilaman — aks holda productiondagi xatoliklarni faqat log'ni ochib ko'rgandagina
@@ -155,19 +256,35 @@ telefon raqami va qarz summalarini olib yuradi.
 `SENTRY_TRACES_SAMPLE_RATE` standart `0` (performans trace'lari o'chiq) —
 ular alohida hisoblanadi va tarifning qimmat qismi.
 
-## 8. Yangilash
+## 10. CI/CD va Avtomatik Yangilash
+
+### A) Avtomatlashtirilgan CI/CD (GitHub Actions)
+Loyiha repozitoriyasiga `.github/workflows/deploy.yml` joylashtirilgan. `main` tarmog'iga har bir `push` bo'lganda:
+1. `backend`, `bot` va `web` testlari hamda linter'lari parallel ravishda yurgiziladi.
+2. Ishlab turgan serverga SSH orqali ulanib, yangi kodni tortadi, konteynerlarni qayta quradi va bazani avtomatik migratsiya qiladi.
+
+GitHub Secrets sozlamalari (`Repository Settings -> Secrets and variables -> Actions`):
+- `SERVER_HOST`: Server IP manzili yoki domeningiz (masalan: `194.26.x.x`).
+- `SERVER_USER`: Server SSH foydalanuvchisi (masalan: `root` yoki `ubuntu`).
+- `SSH_PRIVATE_KEY`: Serverga ulanuvchi SSH maxfiy kaliti (Private Key).
+- `SERVER_PORT`: (Ixtiyoriy) SSH porti (default: `22`).
+
+### B) Qulay va Avtomatik Qo'lda Deploy Script
+Serverda yangilanishlarni bitta buyruq bilan berish uchun:
 
 ```bash
-git pull
-docker compose up -d --build
-docker compose run --rm backend node src/db/migrate.js   # yangi migratsiyalar bo'lsa
+./deploy/deploy.sh
 ```
 
-Migratsiyalar `schema_migrations` jadvali orqali bir martadan bajariladi, shu
-sababli har deployda qayta ishga tushirish xavfsiz.
+Yoki klassik usulda:
 
-> `VITE_API_BASE_URL` bundlega **build vaqtida** kiritiladi, shu sababli uni
-> o'zgartirsangiz `docker compose build web` kerak — restart yetmaydi.
+```bash
+git pull origin main
+docker compose up -d --build
+docker compose run --rm backend node src/db/migrate.js
+```
+
+Migratsiyalar `schema_migrations` jadvali orqali bir martadan bajariladi, shu sababli har deployda qayta ishga tushirish xavfsiz.
 
 ---
 
@@ -179,8 +296,10 @@ sababli har deployda qayta ishga tushirish xavfsiz.
 - **Backendni ko'paytirish mumkin**, lekin rate limit hisoblagichi har bir
   jarayonning xotirasida — 3 ta instans amalda limitni 3 barobar oshiradi.
   Umumiy hisoblagich kerak bo'lsa `rate-limit-redis` ga o'tish kerak.
-- **Cron (eslatmalar) har bir backend instansida ishlaydi.** Bir nechta instans
-  ko'tarsangiz eslatmalar takrorlanadi — scheduler'ni alohida ajratish kerak.
+- **Cron bir nechta instansda xavfsiz.** Kunlik sweep Postgres advisory lock
+  (`pg_try_advisory_lock`) oladi, shuning uchun ikkita backend ko'tarsangiz ham
+  eslatmalar bir marta yuboriladi — qulfni ololmagan instans o'z tikini
+  o'tkazib yuboradi.
 - **Frontendda xatolik monitoringi yo'q.** Backend va bot Sentry'ga ulangan
   (pastga qarang), lekin brauzerdagi xatoliklar faqat `ErrorBoundary` bilan
   ushlanadi va hech qayerga yuborilmaydi.

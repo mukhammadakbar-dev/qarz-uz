@@ -8,30 +8,8 @@ import { contactKeyboard, mainMenu } from '../keyboards/index.js';
  */
 export const handleStart = async (ctx) => {
   const tgId = ctx.from.id;
-  const match = ctx.match || '';
-
   const sess = sessions.get(tgId);
   const lang = sess?.lang || 'uz';
-
-  // Deep-link registration verification (/start verify_<token>).
-  //
-  // The token alone proves nothing — whoever started the registration holds it,
-  // and that may not be the owner of the phone number. So we ask for a contact
-  // card here and let the backend check it against the number the registration
-  // was started for; only Telegram can vouch for that number.
-  if (typeof match === 'string' && match.startsWith('verify_')) {
-    const token = match.slice('verify_'.length);
-    if (!/^[a-f0-9]{64}$/.test(token)) {
-      await ctx.reply(t('verify_err_msg', lang, { msg: 'token yaroqsiz' }));
-      return;
-    }
-    sessions.set(tgId, { lang, pendingVerifyToken: token });
-    await ctx.reply(t('verify_ask_contact', lang), {
-      parse_mode: 'HTML',
-      reply_markup: contactKeyboard(lang),
-    });
-    return;
-  }
 
   if (sessions.isAuthed(tgId)) {
     await ctx.reply(t('menu_title', lang), {
@@ -48,11 +26,7 @@ export const handleStart = async (ctx) => {
 };
 
 /**
- * Contact shared → step 1 of linking: ask the backend to SMS a one-time code.
- *
- * Sharing a contact is NOT proof of ownership (a contact card can be forwarded
- * or fabricated), so no tokens are issued here. The OTP conversation that
- * follows is what actually proves the user controls the number.
+ * Contact shared → login or auto-register user directly in Telegram Bot.
  */
 export const handleContact = async (ctx) => {
   const tgId = ctx.from.id;
@@ -60,7 +34,7 @@ export const handleContact = async (ctx) => {
   const lang = sess.lang || 'uz';
 
   const contact = ctx.message.contact;
-  // only accept the user's own contact, never a forwarded one
+  // only accept the user's own contact
   if (contact.user_id && contact.user_id !== tgId) {
     await ctx.reply(t('reg_need_contact', lang), { reply_markup: contactKeyboard(lang) });
     return;
@@ -69,19 +43,6 @@ export const handleContact = async (ctx) => {
   const phone = contact.phone_number.startsWith('+')
     ? contact.phone_number
     : '+' + contact.phone_number;
-
-  // A web registration is waiting on this contact to prove the number is ours.
-  if (sess.pendingVerifyToken) {
-    const token = sess.pendingVerifyToken;
-    sessions.set(tgId, { pendingVerifyToken: undefined });
-    try {
-      await api.confirmVerifyToken(token, tgId, phone);
-      await ctx.reply(t('verify_ok_msg', lang), { parse_mode: 'HTML' });
-    } catch (err) {
-      await ctx.reply(t('verify_err_msg', lang, { msg: err.message }));
-    }
-    return;
-  }
 
   try {
     const res = await api.directLinkByContact(phone, tgId);
@@ -99,7 +60,7 @@ export const handleContact = async (ctx) => {
         reply_markup: mainMenu(lang, role),
       });
     } else {
-      // New user: store pendingPhone and trigger interactive onboarding
+      // New user -> proceed to bot registration conversation
       sessions.set(tgId, { pendingPhone: phone, lang });
       await ctx.conversation.enter('register');
     }

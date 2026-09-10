@@ -13,6 +13,7 @@ Do'kon egasi uchun boshqaruv paneli. Vite + React + React Router, backend API bi
 npm install
 cp .env.example .env     # VITE_API_BASE_URL ni backend manziliga sozlang
 npm run dev              # http://localhost:5173
+npm run test             # birlik testlari (vitest)
 npm run build            # ishlab chiqarish uchun (dist/)
 ```
 Backend ishga tushgan bo'lishi kerak (qarz-backend).
@@ -49,6 +50,9 @@ src/
 ```
 
 ## Sifat
+- **32 ta birlik testi** (`npm test`, vitest): summa kiritish va kursor
+  pozitsiyasi, muddat yorlig'i, API xato ishlovi (proxy HTML qaytarganda),
+  401 da bir martalik `refresh`, ochiq konfiguratsiya keshi
 - Responsive (mobilgacha), klaviatura fokusi ko'rinadi, `prefers-reduced-motion` hurmat qilinadi
 - API noto'g'ri javob qaytarsa sahifa "oq ekran"ga tushmaydi — xato toast ko'rsatiladi
 - Tokenlar `localStorage` da, 401 da avtomatik `refresh`

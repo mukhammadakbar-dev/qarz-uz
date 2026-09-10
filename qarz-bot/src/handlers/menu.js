@@ -1,6 +1,8 @@
-import { t, money } from '../lib/i18n.js';
+import { InlineKeyboard } from 'grammy';
+import { t, tPlain, money } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { sessions } from '../lib/sessions.js';
+import { getRemoteConfig } from '../lib/remoteConfig.js';
 import { mainMenu, langKeyboard, debtorActions } from '../keyboards/index.js';
 
 // Telegram allows ~1 message/second per chat before it starts returning 429.
@@ -82,6 +84,95 @@ export const handleDashboard = async (ctx) => {
       }),
       { parse_mode: 'HTML', reply_markup: mainMenu(lang, sess.role) }
     );
+  } catch (err) {
+    await replyError(ctx, lang, err);
+  }
+};
+
+/**
+ * Subscription status + tariffs + the way to actually pay for one.
+ *
+ * Online payment is deferred, so renewing is a conversation with the admin:
+ * this shows what the shop is on, what the plans cost, and hands over a
+ * Telegram link with the request pre-written. Without it an owner in the bot
+ * had no indication a subscription even existed until writes started failing.
+ */
+export const handleSubscription = async (ctx) => {
+  const tgId = ctx.from.id;
+  const sess = sessions.get(tgId);
+  const lang = sess?.lang || 'uz';
+  if (!sess?.accessToken) return ctx.reply(t('session_expired', lang));
+
+  try {
+    // Tariffs are public and must still show when the shop's own data fails to
+    // load, so the two calls fail independently.
+    const [stats, plans] = await Promise.all([
+      api.dashboard(tgId).catch(() => null),
+      api.plans().catch(() => []),
+    ]);
+
+    const sub = stats?.subscription || null;
+    const statusLabel = sub ? t(`sub_status_${sub.status}`, lang) : '—';
+    const planName =
+      plans.find((p) => p.code === sub?.plan)?.name || sub?.plan || '—';
+
+    const lines = [
+      t('sub_header', lang),
+      '',
+      t('sub_current', lang, {
+        plan: planName,
+        status: statusLabel,
+        until: sub?.endsAt ? String(sub.endsAt).slice(0, 10) : '—',
+        days: sub?.daysLeft ?? 0,
+      }),
+      '',
+      t('sub_plans_header', lang),
+    ];
+
+    for (const p of plans) {
+      lines.push(
+        t('sub_plan_line', lang, {
+          name: p.name,
+          // A bare "99 000" leaves the reader guessing at both the currency and
+          // the period, so the label carries them — except for a free plan,
+          // where "0 so'm/oy" would be a strange way to say "Bepul".
+          // tPlain, not t: this string is about to be substituted into
+          // sub_plan_line, which escapes what it is given. Escaping here too
+          // would run it through twice and turn an "&" into "&amp;amp;".
+          price:
+            Number(p.price_uzs) === 0
+              ? t('sub_free', lang)
+              : tPlain('sub_price', lang, { amount: money(p.price_uzs) }),
+          debtors: p.max_debtors == null ? t('sub_unlimited', lang) : p.max_debtors,
+          sms: p.monthly_sms,
+        })
+      );
+    }
+
+    const { support } = getRemoteConfig();
+    let keyboard;
+    if (support.telegram) {
+      const text = [
+        'Assalomu alaykum!',
+        'Obunani yangilamoqchiman.',
+        `Telefon: ${sess.phone || '—'}`,
+      ].join('\n');
+      keyboard = new InlineKeyboard().url(
+        t('sub_contact_btn', lang),
+        `https://t.me/${support.telegram}?text=${encodeURIComponent(text)}`
+      );
+    } else {
+      // No contact configured: say so rather than print a t.me link to nowhere.
+      lines.push('', t('sub_no_contact', lang));
+    }
+
+    lines.push('', t('sub_how', lang));
+    if (support.phone) lines.push(t('sub_phone', lang, { phone: support.phone }));
+
+    await ctx.reply(lines.join('\n'), {
+      parse_mode: 'HTML',
+      reply_markup: keyboard,
+    });
   } catch (err) {
     await replyError(ctx, lang, err);
   }

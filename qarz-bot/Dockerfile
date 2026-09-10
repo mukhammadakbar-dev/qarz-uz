@@ -28,4 +28,9 @@ EXPOSE 3001
 
 # --import loads Sentry before any application module. With no SENTRY_DSN set,
 # instrument.js does nothing.
-CMD ["node", "--import", "./src/instrument.js", "--dns-result-order=ipv4first", "src/index.js"]
+# --no-network-family-autoselection: api.telegram.org publishes an AAAA record,
+# and on an IPv4-only host Node's happy-eyeballs tries IPv6 first, gives up after
+# its 250ms attempt window and surfaces the result as ETIMEDOUT instead of
+# falling back — every Telegram call fails while curl on the same host succeeds.
+# Turning it off makes Node honour --dns-result-order and dial IPv4 directly.
+CMD ["node", "--import", "./src/instrument.js", "--dns-result-order=ipv4first", "--no-network-family-autoselection", "src/index.js"]
