@@ -143,7 +143,7 @@ docker compose logs -f bot          # "@<bot> running ✔" va hydrated N session
 
 ```bash
 sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/qarz
-sudo sed -i 's/temirdaftar\.uz/SIZNING-DOMEN.uz/g' /etc/nginx/sites-available/qarz
+sudo sed -i 's/example\.com/SIZNING-DOMEN.uz/g' /etc/nginx/sites-available/qarz
 sudo ln -s /etc/nginx/sites-available/qarz /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d SIZNING-DOMEN.uz -d www.SIZNING-DOMEN.uz

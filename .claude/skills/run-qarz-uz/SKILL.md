@@ -1,6 +1,6 @@
 ---
 name: run-qarz-uz
-description: Build, run, and drive TemirDaftar.uz (qarz-uz) — start the backend API and web app locally, take screenshots of pages, sign in, drive UI flows in a real browser, or run the test suites. Use when asked to run/start/launch the app, screenshot a page, reproduce a bug in the running app, or verify a change end-to-end.
+description: Build, run, and drive TemirDaftar (qarz-uz) — start the backend API and web app locally, take screenshots of pages, sign in, drive UI flows in a real browser, or run the test suites. Use when asked to run/start/launch the app, screenshot a page, reproduce a bug in the running app, or verify a change end-to-end.
 ---
 
 Qarz-uz is three deployables — `qarz-backend` (Express + Postgres), `qarz-web`

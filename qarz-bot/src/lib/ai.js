@@ -236,7 +236,7 @@ export const parseNaturalLanguage = async (text, now = new Date()) => {
 
   try {
     const todayIso = formatDateIso(now);
-    const systemPrompt = `You are a natural language parser for TemirDaftar.uz debt tracking app.
+    const systemPrompt = `You are a natural language parser for TemirDaftar debt tracking app.
 Extract structured details from user text. Today is ${todayIso}.
 
 Output JSON matching this exact structure:

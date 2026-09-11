@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Browser driver for qarz-web (TemirDaftar.uz).
+ * Browser driver for qarz-web (TemirDaftar).
  *
  * The web app is useless without qarz-backend, and every interesting flow —
  * registration, password recovery — needs a 6-digit code that only the Telegram

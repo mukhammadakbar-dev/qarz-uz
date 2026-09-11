@@ -112,7 +112,7 @@ export const requestRegisterOtp = async ({ phone, channel = 'sms' }) => {
   const sent = await issueOtp(normPhone, 'register', ({ code, ttlMinutes }) =>
     sendSms(
       normPhone,
-      `TemirDaftar.uz: royxatdan otish uchun tasdiqlash kodi ${code}. Kod ${ttlMinutes} daqiqa amal qiladi. Bu kodni hech kimga bermang.`
+      `TemirDaftar: royxatdan otish uchun tasdiqlash kodi ${code}. Kod ${ttlMinutes} daqiqa amal qiladi. Bu kodni hech kimga bermang.`
     )
   );
   if (!sent.ok) {
@@ -419,7 +419,7 @@ export const requestTelegramLink = async ({ phone }) => {
   const sent = await issueOtp(normPhone, 'telegram_link', ({ code, ttlMinutes }) =>
     sendSms(
       normPhone,
-      `TemirDaftar.uz: Telegram botni ulash uchun tasdiqlash kodi ${code}. Kod ${ttlMinutes} daqiqa amal qiladi. Bu kodni hech kimga bermang.`
+      `TemirDaftar: Telegram botni ulash uchun tasdiqlash kodi ${code}. Kod ${ttlMinutes} daqiqa amal qiladi. Bu kodni hech kimga bermang.`
     )
   );
   // Previously this claimed { sent: true } no matter what the provider did, so

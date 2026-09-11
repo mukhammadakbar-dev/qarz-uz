@@ -81,7 +81,7 @@ export default function Login() {
     <div className="login-root">
       <div className="login-card">
         <div className="login-head">
-          <div className="logo-badge">TemirDaftar.uz</div>
+          <div className="logo-badge">TemirDaftar</div>
           <h2>SuperAdmin Paneli</h2>
           <p className="subtext">Tizimni boshqarish uchun avtorizatsiyadan o'ting</p>
         </div>
@@ -114,7 +114,7 @@ export default function Login() {
 
         <div className="user-notice-card" style={{ marginTop: '24px', padding: '16px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
           <p style={{ fontSize: '13px', color: '#8e8ea0', marginBottom: '12px', lineHeight: '1.5' }}>
-            ℹ️ <b>Oddiy foydalanuvchilar uchun:</b> TemirDaftar.uz xizmatlaridan foydalanish faqat Telegram Bot va Mini App orqali amalga oshiriladi.
+            ℹ️ <b>Oddiy foydalanuvchilar uchun:</b> TemirDaftar xizmatlaridan foydalanish faqat Telegram Bot va Mini App orqali amalga oshiriladi.
           </p>
           <a
             href="https://t.me/tDaftar_bot"

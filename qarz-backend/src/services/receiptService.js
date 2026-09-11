@@ -23,7 +23,7 @@ function formatMoney(amount) {
  * @returns {Buffer} PNG image buffer
  */
 export function generateReceiptPng({
-  shopName = "TemirDaftar.uz Do'koni",
+  shopName = "TemirDaftar Do'koni",
   debtorName = 'Mijoz',
   type = 'given',
   amount = 0,
@@ -122,7 +122,7 @@ export function generateReceiptPng({
     <!-- Footer Branding -->
     <rect x="80" y="580" width="440" height="90" rx="16" fill="#1E293B"/>
     <text x="300" y="618" font-family="sans-serif" font-size="16" font-weight="bold" fill="#38BDF8" text-anchor="middle">
-      TemirDaftar.uz — Qarzlarni xavfsiz boshqaruv tizimi
+      TemirDaftar — Qarzlarni xavfsiz boshqaruv tizimi
     </text>
     <text x="300" y="645" font-family="sans-serif" font-size="13" fill="#64748B" text-anchor="middle">
       ${payUrl ? 'To\'lov qilish uchun botdagi to\'lov linkidan foydalaning' : 'Ushbu kvitansiya avtomatik generatsiya qilindi'}

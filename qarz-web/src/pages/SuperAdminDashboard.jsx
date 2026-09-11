@@ -43,7 +43,7 @@ export default function SuperAdminDashboard() {
       <div className="page-head">
         <div>
           <h2>Boshqaruv Paneli</h2>
-          <p className="subtext">TemirDaftar.uz platformasi umumiy ko'rsatkichlari va tezkor boshqaruv</p>
+          <p className="subtext">TemirDaftar platformasi umumiy ko'rsatkichlari va tezkor boshqaruv</p>
         </div>
       </div>
 

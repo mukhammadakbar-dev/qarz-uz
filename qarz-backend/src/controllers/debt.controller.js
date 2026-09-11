@@ -155,7 +155,7 @@ export const getDebtReceipt = asyncHandler(async (req, res) => {
   // `req.user` is built by the authenticate middleware and exposes camelCase
   // `fullName`; reading `full_name` here was always undefined, so a personal
   // user's receipt fell back to the product name instead of showing their own.
-  let shopName = 'TemirDaftar.uz';
+  let shopName = 'TemirDaftar';
   if (debt.shop_id) {
     const { rows: shopRows } = await query('SELECT name FROM shops WHERE id = $1', [debt.shop_id]);
     if (shopRows[0]) shopName = shopRows[0].name;
