@@ -268,6 +268,11 @@ GitHub Secrets sozlamalari (`Repository Settings -> Secrets and variables -> Act
 - `SERVER_USER`: Server SSH foydalanuvchisi (masalan: `root` yoki `ubuntu`).
 - `SSH_PRIVATE_KEY`: Serverga ulanuvchi SSH maxfiy kaliti (Private Key).
 - `SERVER_PORT`: (Ixtiyoriy) SSH porti (default: `22`).
+- `SERVER_PROJECT_DIR`: (Ixtiyoriy) loyiha papkasi (default: `/srv/qarz`).
+
+> Server **oddiy sshd** bilan ishlashi shart. Har bir ulanishni tmux/web-terminal
+> sessiyasiga yo'naltiradigan "shell" xizmatlarida CI buyruq bajara olmaydi —
+> ulanish ochiq sessiyaga yopishib, 10 daqiqadan keyin timeout bo'ladi.
 
 ### B) Qulay va Avtomatik Qo'lda Deploy Script
 Serverda yangilanishlarni bitta buyruq bilan berish uchun:
@@ -285,6 +290,106 @@ docker compose run --rm backend node src/db/migrate.js
 ```
 
 Migratsiyalar `schema_migrations` jadvali orqali bir martadan bajariladi, shu sababli har deployda qayta ishga tushirish xavfsiz.
+
+---
+
+## 11. VPS (pm2, Dockersiz)
+
+Docker o'rniga servislar to'g'ridan-to'g'ri pm2 ostida ishlaydi: `qarz-backend`
+va `qarz-bot` — `ecosystem.config.cjs` dan, web esa build qilingan statik fayl
+sifatida nginx'dan (`deploy/nginx.pm2.conf.example`). `deploy/deploy.sh` pm2
+o'rnatilganini ko'rsa shu yo'lni tanlaydi.
+
+Talab: Ubuntu 22.04/24.04, **systemd va sshd** bor oddiy VPS, o'zingizga
+tegishli domen (A-yozuvi VPS IP'siga qaratilgan).
+
+**1. Paketlar (VPS'da, root):**
+
+```bash
+apt update && apt install -y git nginx certbot python3-certbot-nginx postgresql
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
+npm install -g pm2
+```
+
+**2. Postgres:**
+
+```bash
+DBPASS=$(openssl rand -base64 24 | tr -d '/+='); echo "DB parol: $DBPASS"
+sudo -u postgres psql -c "CREATE USER qarz WITH PASSWORD '$DBPASS';"
+sudo -u postgres psql -c "CREATE DATABASE qarz OWNER qarz;"
+```
+
+**3. Repo (read-only deploy key orqali — `git pull` parol so'ramasligi uchun):**
+
+```bash
+ssh-keygen -t ed25519 -N "" -C qarz-vps-deploy-key -f ~/.ssh/github_deploy
+cat ~/.ssh/github_deploy.pub   # GitHub → repo Settings → Deploy keys → Add (Write YO'Q)
+cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  IdentityFile ~/.ssh/github_deploy
+  IdentitiesOnly yes
+EOF
+ssh -T git@github.com            # "successfully authenticated" chiqishi kerak
+git clone git@github.com:mukhammadakbar-dev/qarz-uz.git /srv/qarz
+```
+
+**4. Sozlamalar** — har bir servis o'z `.env` ini o'qiydi:
+
+```bash
+cd /srv/qarz
+cp qarz-backend/.env.example qarz-backend/.env && chmod 600 qarz-backend/.env
+cp qarz-bot/.env.example     qarz-bot/.env     && chmod 600 qarz-bot/.env
+```
+
+`qarz-backend/.env`: `NODE_ENV=production`, `DB_*` (2-qadam), `PUBLIC_BASE_URL`,
+`CORS_ORIGINS`, `TRUST_PROXY=1`, JWT/`PAYMENT_LINK_SECRET`, `BOT_SHARED_SECRET`,
+`SUPER_ADMIN_*` va 2-bo'limdagi boshqa majburiy qiymatlar.
+`qarz-bot/.env`: `TELEGRAM_BOT_TOKEN`, `API_BASE_URL=http://127.0.0.1:4000`,
+`BOT_SHARED_SECRET` (backend bilan **bir xil**), `WEB_APP_URL=https://<domen>`.
+
+**5. Birinchi ishga tushirish:**
+
+```bash
+cd /srv/qarz
+(cd qarz-backend && npm ci --omit=dev && npm run migrate && npm run seed)
+(cd qarz-bot && npm ci --omit=dev)
+(cd qarz-web && npm ci && npm run build)
+pm2 start ecosystem.config.cjs && pm2 save
+pm2 startup systemd -u root --hp /root   # reboot'dan keyin ham ko'tariladi
+```
+
+**6. nginx + TLS:**
+
+```bash
+cp deploy/nginx.pm2.conf.example /etc/nginx/sites-available/qarz
+sed -i 's/example\.com/SIZNING-DOMEN.uz/g' /etc/nginx/sites-available/qarz
+ln -s /etc/nginx/sites-available/qarz /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+certbot --nginx -d SIZNING-DOMEN.uz -d www.SIZNING-DOMEN.uz
+curl -s https://SIZNING-DOMEN.uz/health
+```
+
+**7. CI kaliti** — kalitni **o'z kompyuteringizda** yarating (serverda emas):
+
+```bash
+ssh-keygen -t ed25519 -N "" -C qarz-uz-deploy-ci -f ~/.ssh/qarz_ci
+ssh-copy-id -i ~/.ssh/qarz_ci.pub root@VPS_IP
+ssh -i ~/.ssh/qarz_ci root@VPS_IP 'echo ok'
+gh secret set SERVER_HOST --body VPS_IP
+gh secret set SERVER_USER --body root
+gh secret set SSH_PRIVATE_KEY < ~/.ssh/qarz_ci
+gh secret delete SERVER_PASSWORD
+```
+
+Shundan keyin `main` ga har bir push avtomatik deploy qiladi.
+
+**Eski serverdan ma'lumotni ko'chirish** (bazasi bo'lsa): eski serverda
+`pg_dump -Fc -U <user> -h <host> <db> > qarz.dump`, faylni VPS'ga `scp` qiling,
+VPS'da 5-qadamdagi `migrate`/`seed` o'rniga
+`pg_restore --no-owner -U qarz -h 127.0.0.1 -d qarz qarz.dump`. Eski serverdagi
+botni **to'xtating** (`pm2 stop qarz-bot`) — bitta token bilan ikki bot
+ishlasa, Telegram `409 Conflict` beradi.
 
 ---
 

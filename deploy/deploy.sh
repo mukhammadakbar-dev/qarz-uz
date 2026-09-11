@@ -29,14 +29,23 @@ for NVM_SH in "${NVM_DIR:-}/nvm.sh" /usr/local/nvm/nvm.sh "$HOME/.nvm/nvm.sh"; d
   fi
 done
 
-if [ ! -f .env ]; then
+if command -v pm2 >/dev/null 2>&1; then
+  # pm2 layout: each service reads its own .env (dotenv, from its cwd).
+  for f in qarz-backend/.env qarz-bot/.env; do
+    if [ ! -f "$f" ]; then
+      echo "❌ Error: $ROOT_DIR/$f missing. Copy it from ${f}.example and fill in secrets."
+      exit 1
+    fi
+  done
+elif [ ! -f .env ]; then
   echo "❌ Error: .env file missing in $ROOT_DIR. Please copy .env.production.example to .env and configure secrets."
   exit 1
 fi
 
 echo "📥 Pulling latest updates from git repository..."
 git config --global --add safe.directory "$ROOT_DIR" 2>/dev/null || true
-git pull --ff-only origin main
+# Never prompt: a credential prompt would hang the CI run until it times out.
+GIT_TERMINAL_PROMPT=0 git pull --ff-only origin main
 
 if command -v pm2 >/dev/null 2>&1; then
   echo "📦 Installing dependencies..."
@@ -48,8 +57,10 @@ if command -v pm2 >/dev/null 2>&1; then
   echo "🗄️ Executing database migrations..."
   (cd qarz-backend && node src/db/migrate.js)
 
-  echo "🔄 Restarting PM2 processes..."
-  pm2 restart qarz-backend qarz-bot qarz-web --update-env
+  echo "🔄 Reloading PM2 processes..."
+  # Starts anything in the ecosystem file that is not running yet (first
+  # deploy) and reloads the rest.
+  pm2 startOrReload ecosystem.config.cjs --update-env
   pm2 save
   pm2 ls
 else
