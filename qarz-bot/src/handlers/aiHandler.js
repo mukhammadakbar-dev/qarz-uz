@@ -18,7 +18,7 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref();
 
 /** Primary handler for natural language messages */
-export const handleAiMessage = async (ctx) => {
+export const handleAiMessage = async (ctx, overrideText) => {
   const tgId = ctx.from.id;
   const sess = sessions.get(tgId);
   const lang = sess?.lang || 'uz';
@@ -27,7 +27,8 @@ export const handleAiMessage = async (ctx) => {
     return handleStart(ctx);
   }
 
-  const text = ctx.message?.text;
+  // grammY calls handlers as (ctx, next), so only a string counts as override.
+  const text = typeof overrideText === 'string' ? overrideText : ctx.message?.text;
   if (!text) return;
 
   try {
@@ -173,8 +174,9 @@ export const handleAiCallback = async (ctx) => {
   if (action === 'demo') {
     const demoText = lang === 'ru' ? 'Али 100тыс сум понедельник' : 'Ali 100ming som dushanba';
     await ctx.reply(t('ai_demo_success', lang), { parse_mode: 'HTML' });
-    ctx.message = { text: demoText };
-    return handleAiMessage(ctx);
+    // ctx.message is a getter-only property on grammY's Context, so the demo
+    // text is handed over directly instead of being assigned onto ctx.
+    return handleAiMessage(ctx, demoText);
   }
 
   if (action === 'cancel') {
