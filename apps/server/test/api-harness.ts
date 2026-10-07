@@ -76,8 +76,8 @@ export async function createApiHarness(
     botInfo: {
       id: 1,
       is_bot: true,
-      first_name: 'Temir Daftar',
-      username: 'tdaftar_bot',
+      first_name: 'Kissa',
+      username: 'kissauzbot',
     } as UserFromGetMe,
   });
   const sentMessages: { chatId: number; text: string }[] = [];

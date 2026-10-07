@@ -32,7 +32,7 @@ beforeAll(async () => {
     logger,
     pool,
     handlers: false,
-    botInfo: { id: 1, is_bot: true, first_name: 'T', username: 'tdaftar_bot' } as UserFromGetMe,
+    botInfo: { id: 1, is_bot: true, first_name: 'T', username: 'kissauzbot' } as UserFromGetMe,
   });
   app = buildServer({ config, logger, pool, bot });
   const requireBusiness = createRequireBusiness({ config, pool });

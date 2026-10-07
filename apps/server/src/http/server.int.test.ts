@@ -22,8 +22,8 @@ const config = loadConfig({
 const botInfo = {
   id: 123456789,
   is_bot: true,
-  first_name: 'Temir Daftar',
-  username: 'tdaftar_bot',
+  first_name: 'Kissa',
+  username: 'kissauzbot',
 } as UserFromGetMe;
 
 let pool: Pool;

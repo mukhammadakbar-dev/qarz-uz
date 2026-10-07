@@ -76,7 +76,7 @@ cd /srv/nasiya/apps/server && sudo -u deploy node --env-file=/etc/nasiya/server.
 Tekshiruv:
 
 - `curl https://<domen>/healthz` → `{"status":"ok"}`
-- Telegram’da `@tdaftar_bot` ga `/start`
+- Telegram’da `@kissauzbot` ga `/start`
 - `pm2 logs nasiya`
 
 ## 5a. Mini App

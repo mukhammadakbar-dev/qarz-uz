@@ -71,8 +71,8 @@ export async function createHarness(
     botInfo: {
       id: 1,
       is_bot: true,
-      first_name: 'Temir Daftar',
-      username: 'tdaftar_bot',
+      first_name: 'Kissa',
+      username: 'kissauzbot',
     } as UserFromGetMe,
   });
   const sent: Sent[] = [];

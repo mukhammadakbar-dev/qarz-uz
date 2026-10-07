@@ -37,7 +37,7 @@ beforeAll(async () => {
     logger,
     pool,
     handlers: false,
-    botInfo: { id: 1, is_bot: true, first_name: 'T', username: 'tdaftar_bot' } as UserFromGetMe,
+    botInfo: { id: 1, is_bot: true, first_name: 'T', username: 'kissauzbot' } as UserFromGetMe,
   });
   bot.api.config.use(async () => ({ ok: true, result: true }) as never);
   seenUserIds = [];

@@ -406,7 +406,7 @@ describe('xodimlar, sozlamalar, obuna (TT §34)', () => {
     const s = await h.shop();
     const res = await h.call('POST', '/api/staff/invites', { ...as(s), key: true });
     expect(res.status).toBe(201);
-    expect(res.body.link).toMatch(/^https:\/\/t\.me\/tdaftar_bot\?start=inv_[A-Za-z0-9_-]{32}$/);
+    expect(res.body.link).toMatch(/^https:\/\/t\.me\/kissauzbot\?start=inv_[A-Za-z0-9_-]{32}$/);
     expect(
       (await h.call('POST', '/api/staff/invites', { ...as(s, 'staff'), key: true })).status,
     ).toBe(403);
@@ -566,13 +566,13 @@ describe('Mini App statik fayllari (/app/)', () => {
     const { join } = await import('node:path');
     const dir = await mkdtemp(join(tmpdir(), 'miniapp-'));
     await mkdir(join(dir, 'assets'));
-    await writeFile(join(dir, 'index.html'), '<!doctype html><title>Temir Daftar</title>');
+    await writeFile(join(dir, 'index.html'), '<!doctype html><title>Kissa</title>');
     await writeFile(join(dir, 'assets', 'app-abc123.js'), 'console.log(1)');
     const hh = await createApiHarness({}, { miniAppDir: dir });
     try {
       const index = await hh.app.inject({ method: 'GET', url: '/app/' });
       expect(index.statusCode).toBe(200);
-      expect(index.body).toContain('Temir Daftar');
+      expect(index.body).toContain('Kissa');
       expect(index.headers['cache-control']).toBe('no-cache');
       expect(String(index.headers['content-security-policy'])).toContain("script-src 'self'");
 

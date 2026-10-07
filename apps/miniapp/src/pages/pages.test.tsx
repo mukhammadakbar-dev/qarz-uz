@@ -286,14 +286,14 @@ describe('Staff', () => {
       members: [member({ userId: 'u1', name: 'Egasi', role: 'OWNER' }), member()],
     });
     api.invite.mockResolvedValue({
-      link: 'https://t.me/tdaftar_bot?start=inv_abc',
+      link: 'https://t.me/kissauzbot?start=inv_abc',
       expiresAt: '2026-10-09T10:00:00Z',
     });
     const user = userEvent.setup();
     renderApp(<Staff />, { api });
     await user.click(await screen.findByRole('button', { name: 'Xodim taklif qilish' }));
     expect(await screen.findByLabelText('link')).toHaveValue(
-      'https://t.me/tdaftar_bot?start=inv_abc',
+      'https://t.me/kissauzbot?start=inv_abc',
     );
     expect(api.invite).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f-]{36}$/));
   });

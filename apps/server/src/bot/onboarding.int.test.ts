@@ -107,8 +107,8 @@ beforeAll(async () => {
     botInfo: {
       id: 1,
       is_bot: true,
-      first_name: 'Temir Daftar',
-      username: 'tdaftar_bot',
+      first_name: 'Kissa',
+      username: 'kissauzbot',
     } as UserFromGetMe,
   });
   bot.api.config.use(async (_prev, method, payload) => {
@@ -226,9 +226,7 @@ describe('xodim taklifi', () => {
   it('egasi havola yaratadi, xodim qo‘shiladi, egasiga xabar boradi, token qayta ishlamaydi', async () => {
     const owner = await onboard('Egasi', 'Baraka');
     await owner.text('/invite');
-    const link = owner
-      .last()
-      .text.match(/https:\/\/t\.me\/tdaftar_bot\?start=(inv_[A-Za-z0-9_-]+)/);
+    const link = owner.last().text.match(/https:\/\/t\.me\/kissauzbot\?start=(inv_[A-Za-z0-9_-]+)/);
     expect(link).not.toBeNull();
     const payload = link![1]!;
 
