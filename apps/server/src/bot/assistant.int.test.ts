@@ -313,7 +313,12 @@ describe('yetishmagan ma’lumot (TT §11)', () => {
     await s.customer('Murod', 450000);
     await s.owner.text('Murod');
     expect(s.owner.last()).toBe('Murod\nQarz: 450 000 so‘m');
-    expect(s.owner.buttons().map((b) => b.text)).toEqual(['➕ Nasiya', '💵 To‘lov', '🕘 Tarix']);
+    expect(s.owner.buttons().map((b) => b.text)).toEqual([
+      '➕ Nasiya',
+      '💵 To‘lov',
+      '🕘 Tarix',
+      '📱 Ilovani ochish',
+    ]);
   });
 
   it('menyudagi “Nasiya” tugmasi summa so‘raydi', async () => {
@@ -670,6 +675,31 @@ describe('mijoz yaratish va tez tugmalar', () => {
     expect(s.owner.last()).toContain('Murod 50 ming');
     await s.owner.text('💵 To‘lov qo‘shish');
     expect(s.owner.last()).toContain('Murod 20 ming berdi');
+  });
+});
+
+describe('Mini App bilan bog‘lash', () => {
+  it('/app buyrug‘i web_app tugmasini beradi', async () => {
+    const s = await shop();
+    const mark = s.owner.mark();
+    await s.owner.text('/app');
+    expect(s.owner.since(mark)).toHaveLength(1);
+    const last = s.owner.messages().at(-1)!;
+    expect(last.markup?.inline_keyboard?.[0]?.[0]?.web_app?.url).toBe(
+      'https://nasiya.example.uz/app',
+    );
+  });
+
+  it('mijoz menyusida Mini App tugmasi shu mijozni ochadi (?c=<id>)', async () => {
+    const s = await shop();
+    const c = await s.customer('Murod', 1000);
+    await s.owner.text('Murod');
+    const web = s.owner
+      .messages()
+      .at(-1)!
+      .markup?.inline_keyboard?.flat()
+      .find((b) => b.web_app);
+    expect(web?.web_app?.url).toBe(`https://nasiya.example.uz/app?c=${c.id}`);
   });
 });
 

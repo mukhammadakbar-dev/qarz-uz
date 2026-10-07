@@ -65,7 +65,10 @@ export interface AssistantDeps {
 const toKeyboard = (buttons: readonly (readonly Button[])[]): InlineKeyboard => {
   const kb = new InlineKeyboard();
   for (const row of buttons) {
-    for (const b of row) kb.text(b.text, b.data);
+    for (const b of row) {
+      if (b.webAppUrl) kb.webApp(b.text, b.webAppUrl);
+      else kb.text(b.text, b.data);
+    }
     kb.row();
   }
   return kb;
@@ -110,6 +113,7 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
     t: ctx.t,
     draftId,
     supportLine: supportLine(ctx),
+    miniAppUrl: deps.config.telegram.miniAppUrl,
   });
 
   async function accessOf(ctx: BotContext): Promise<BusinessAccess | null> {

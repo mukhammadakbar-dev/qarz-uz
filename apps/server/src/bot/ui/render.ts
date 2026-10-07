@@ -11,7 +11,10 @@ import type { MessageKey, Params } from '../../i18n/index.js';
 
 export interface Button {
   readonly text: string;
+  /** Callback ma'lumoti (callback tugma). */
   readonly data: string;
+  /** Berilsa tugma Mini App ochadi (web_app); `data` e'tiborsiz. */
+  readonly webAppUrl?: string;
 }
 
 export interface Rendered {
@@ -25,6 +28,8 @@ export interface RenderContext {
   /** Qoralama yaratilgan bo'lsa uning ID si (tasdiq tugmalari uchun). */
   readonly draftId: string | null;
   readonly supportLine: string;
+  /** Mini App manzili (sozlangan bo'lsa mijoz menyusida “Ilovada ochish” tugmasi chiqadi). */
+  readonly miniAppUrl?: string | undefined;
 }
 
 const money = (n: number, rc: RenderContext) => formatUzs(n, rc.locale);
@@ -42,14 +47,31 @@ const cancelButton = (rc: RenderContext): Button => ({
   data: 'x:cancel',
 });
 
+/** Mini App'ni shu mijoz sahifasida ochish uchun manzil (`?c=<id>`; Telegram o'z parametrlarini hash'ga qo'shadi). */
+export const miniAppCustomerUrl = (base: string, customerId: string): string => {
+  const url = new URL(base);
+  url.searchParams.set('c', customerId);
+  return url.toString();
+};
+
 export function customerMenuButtons(customerId: string, rc: RenderContext): Button[][] {
-  return [
+  const rows: Button[][] = [
     [
       { text: rc.t('button.addDebt'), data: `m:${customerId}:debt` },
       { text: rc.t('button.addPayment'), data: `m:${customerId}:pay` },
       { text: rc.t('button.history'), data: `m:${customerId}:hist` },
     ],
   ];
+  if (rc.miniAppUrl) {
+    rows.push([
+      {
+        text: rc.t('menu.openApp'),
+        data: '',
+        webAppUrl: miniAppCustomerUrl(rc.miniAppUrl, customerId),
+      },
+    ]);
+  }
+  return rows;
 }
 
 const nameOf = (c: CustomerRef | null, fallback = ''): string => (c ? displayName(c) : fallback);

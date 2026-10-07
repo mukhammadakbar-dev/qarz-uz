@@ -74,6 +74,9 @@ export function initTelegram(): TelegramEnv {
   } catch {
     startParam = null;
   }
+  // Bot web_app tugmasi `?c=<mijoz-id>` bilan ochadi (startapp faqat havola orqali ishlaydi)
+  const queryCustomer = new URLSearchParams(globalThis.location?.search ?? '').get('c');
+  if (!startParam && queryCustomer) startParam = `c_${queryCustomer}`;
   return { initData, startParam, inTelegram: true };
 }
 

@@ -42,6 +42,18 @@ logger.info(
 );
 await bot.init();
 registerFallback(bot);
+if (config.telegram.miniAppUrl) {
+  // Chat pastidagi menyu tugmasi Mini App'ni ochadi (hamma foydalanuvchi uchun)
+  await bot.api
+    .setChatMenuButton({
+      menu_button: {
+        type: 'web_app',
+        text: '📱 Ilova',
+        web_app: { url: config.telegram.miniAppUrl },
+      },
+    })
+    .catch((error: unknown) => logger.warn({ err: error }, 'menyu tugmasi o‘rnatilmadi'));
+}
 // Mini App build'i: dev (src/) va production (dist/) joylashuvidan topiladi
 const miniAppDir = ['../../miniapp/dist', '../../../miniapp/dist']
   .map((p) => fileURLToPath(new URL(p, import.meta.url)))

@@ -48,6 +48,7 @@ CURRENT="$(git rev-parse HEAD)"
 
 pnpm install --frozen-lockfile
 pnpm --filter @nasiya/server build
+pnpm --filter @nasiya/miniapp build
 log "migratsiyalar"
 migrate
 log "PM2 qayta yuklanmoqda"
@@ -63,6 +64,7 @@ log "XATO: /readyz javob bermadi. Avvalgi versiyaga qaytilmoqda: $PREVIOUS"
 git reset --hard "$PREVIOUS"
 pnpm install --frozen-lockfile
 pnpm --filter @nasiya/server build
+pnpm --filter @nasiya/miniapp build
 reload
 if healthy; then log "qaytarildi: $PREVIOUS"; else log "QAYTARISH HAM MUVAFFAQIYATSIZ — qo'lda tekshiring: pm2 logs nasiya"; fi
 exit 1

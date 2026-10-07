@@ -17,6 +17,8 @@ pnpm install
 pnpm check            # lint + typecheck + format + test
 pnpm test             # vitest
 pnpm golden:validate  # golden dataset tekshiruvi
+pnpm test:int         # integratsion testlar (scripts/dev-db.sh up kerak)
+pnpm dev:miniapp      # Mini App dev server (apps/miniapp/.env.local: pnpm --filter @nasiya/server dev:initdata <tg_id>)
 ```
 
 Node >= 22, pnpm 11.

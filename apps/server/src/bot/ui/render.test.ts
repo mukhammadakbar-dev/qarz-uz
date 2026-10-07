@@ -242,3 +242,18 @@ describe('renderDecision: boshqa', () => {
     expect(translate('uz-Latn', 'cancelled')).toBe('Bekor qilindi.');
   });
 });
+
+describe('Mini App bilan bog‘lash', () => {
+  it('mijoz menyusida “Ilovani ochish” tugmasi mijoz ID si bilan (miniAppUrl sozlangan bo‘lsa)', () => {
+    const d = dec(
+      { ...base, intent: 'VIEW_CUSTOMER_BALANCE', amount: null, amountKind: 'NONE' },
+      cust(5000),
+    );
+    const withApp = renderDecision(d, { ...rc(), miniAppUrl: 'https://nasiya.example.uz/app/' })!;
+    const web = withApp.buttons.flat().find((b) => b.webAppUrl);
+    expect(web?.webAppUrl).toBe('https://nasiya.example.uz/app/?c=c1');
+    expect(web?.text).toBe('📱 Ilovani ochish');
+    const without = renderDecision(d, rc())!;
+    expect(without.buttons.flat().some((b) => b.webAppUrl)).toBe(false);
+  });
+});

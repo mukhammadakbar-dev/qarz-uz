@@ -39,7 +39,7 @@ export const uzLatn = {
   'role.OWNER': 'Egasi',
   'role.STAFF': 'Xodim',
 
-  help: 'Temir Daftar — nasiya hisobi.\n\nOddiy yozing:\n• Murod 450 ming — nasiya yozish\n• Murod 200 ming berdi — to‘lov\n• Murod qancha qarz? — qoldiq\n\nBuyruqlar:\n/menu — asosiy menyu\n/invite — xodim taklif qilish (egasi)\n/lang — tilni almashtirish\n/help — yordam',
+  help: 'Temir Daftar — nasiya hisobi.\n\nOddiy yozing:\n• Murod 450 ming — nasiya yozish\n• Murod 200 ming berdi — to‘lov\n• Murod qancha qarz? — qoldiq\n\nBuyruqlar:\n/menu — asosiy menyu\n/app — ilovani ochish\n/invite — xodim taklif qilish (egasi)\n/lang — tilni almashtirish\n/help — yordam',
 
   'error.generic': 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko‘ring.',
   'error.noBusiness': 'Avval biznes yarating: /start',

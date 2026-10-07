@@ -171,6 +171,14 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
 
   bot.command('help', (ctx) => ctx.reply(ctx.t('help')));
 
+  bot.command('app', (ctx) => {
+    const url = deps.config.telegram.miniAppUrl;
+    if (!url) return ctx.reply(ctx.t('menu.noApp'));
+    return ctx.reply(ctx.t('menu.openApp'), {
+      reply_markup: new InlineKeyboard().webApp(ctx.t('menu.openApp'), url),
+    });
+  });
+
   bot.command('lang', (ctx) => ctx.reply(ctx.t('lang.pick'), { reply_markup: langKeyboard(ctx) }));
 
   bot.callbackQuery(/^lang:(uz-Latn|uz-Cyrl)$/, async (ctx) => {

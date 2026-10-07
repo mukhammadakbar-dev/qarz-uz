@@ -43,6 +43,7 @@ SYSTEM_DATABASE_URL=postgres://nasiya_system:<SYSTEM_PW>@localhost:5432/nasiya
 TELEGRAM_BOT_TOKEN=<BotFather tokeni>
 TELEGRAM_WEBHOOK_SECRET=<openssl rand -hex 32>
 PUBLIC_BASE_URL=https://<domen>
+MINIAPP_URL=https://<domen>/app/
 SESSION_SECRET=<openssl rand -hex 32>
 SUPERADMIN_TELEGRAM_IDS=840369610
 SUPPORT_PHONE=+998907900110
@@ -78,9 +79,17 @@ Tekshiruv:
 - Telegram’da `@tdaftar_bot` ga `/start`
 - `pm2 logs nasiya`
 
+## 5a. Mini App
+
+Mini App Node jarayonining o‘zi tomonidan `/app/` ostida beriladi (`apps/miniapp/dist`, `deploy.sh` quradi). Alohida statik hosting kerak emas.
+
+- `MINIAPP_URL` (HTTPS majburiy, oxirida `/app/`) berilsa, bot ishga tushganda chat menyusidagi **📱 Ilova** tugmasini o‘rnatadi, `/app` buyrug‘i va mijoz menyusidagi “Ilovani ochish” tugmalari shu manzilni ochadi.
+- Tekshiruv: `curl -I https://<domen>/app/` → `200`, `cache-control: no-cache`; Telegram’da botni oching → **📱 Ilova**.
+- Mini App faqat Telegram ichida kira oladi (`initData` imzosi tekshiriladi). Brauzerda to‘g‘ridan-to‘g‘ri ochilsa “Telegram ichida oching” deydi.
+
 ## 6. Keyingi deploy’lar
 
-`deploy/deploy.sh`: `git reset --hard origin/main` → `pnpm install` → build → migratsiyalar → `pm2 startOrReload` → `/readyz` tekshiruvi. Tekshiruv o‘tmasa avvalgi commitga qaytadi.
+`deploy/deploy.sh`: `git reset --hard origin/main` → `pnpm install` → server va Mini App build → migratsiyalar → `pm2 startOrReload` → `/readyz` tekshiruvi. Tekshiruv o‘tmasa avvalgi commitga qaytadi.
 
 Migratsiyalar faqat oldinga ketadi, rollback sxemani qaytarmaydi. Shu sababli har bir migratsiya avvalgi kod versiyasi bilan mos ishlashi kerak (avval ustun qo‘shish, keyin ishlatish, eng oxirida eskisini olib tashlash).
 
