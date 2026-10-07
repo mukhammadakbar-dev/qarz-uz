@@ -22,7 +22,7 @@ TT MVP uchun modular monolith tavsiya qiladi (§38). Microservices, Kafka va Kub
 | Test          | vitest, fast-check (property testlar), **real PostgreSQL** (pg-mem emas: trigger, RLS va lock'lar kerak)                                                     |
 | Lint / format | oxlint + prettier                                                                                                                                            |
 | Log / xato    | pino (redaction bilan) + Sentry                                                                                                                              |
-| Deploy        | VPS + Nginx (TLS) + PM2 (`ecosystem.config.cjs`). Docker **faqat lokal dev** uchun (`scripts/dev-db.sh`, Postgres 16)                                                        |
+| Deploy        | VPS + Nginx (TLS) + PM2 (`ecosystem.config.cjs`). Docker **faqat lokal dev** uchun (`scripts/dev-db.sh`, Postgres 16)                                        |
 
 ### Server modullari
 
