@@ -1,6 +1,7 @@
+import type { Locale } from '@nasiya/shared';
 import type { Pool } from 'pg';
 
-export type Locale = 'uz-Latn' | 'uz-Cyrl';
+export type { Locale };
 
 export interface User {
   readonly id: string;
