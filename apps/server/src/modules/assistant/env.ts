@@ -65,6 +65,9 @@ async function candidates(
 export interface AssistantEnv extends DialogEnv {
   /** Oxirgi tahlil jurnali yozuvining ID si (qoralama bilan bog'lash uchun). */
   lastInterpretationId(): string | null;
+  /** Oxirgi tahlildagi telefon (mijoz yaratish) va UNKNOWN sababi. */
+  lastParsedPhone(): string | undefined;
+  lastParsedReason(): string | undefined;
 }
 
 export type InterpretFn = (
@@ -79,17 +82,24 @@ export async function createAssistantEnv(
   const writable = await isBusinessWritable(pool, access);
   const cache = new Map<string, ParsedIntent>();
   let lastId: string | null = null;
+  let lastParsed: ParsedIntent | null = null;
 
   return {
     writable,
     lastInterpretationId: () => lastId,
+    lastParsedPhone: () => lastParsed?.phone,
+    lastParsedReason: () => lastParsed?.reason,
     // Bir qadamda reducer parse'ni bir necha marta chaqirishi mumkin: bir xil matn faqat bir marta tahlil qilinadi
     async parse(text) {
       const cached = cache.get(text);
-      if (cached) return cached;
+      if (cached) {
+        lastParsed = cached;
+        return cached;
+      }
       const { parsed, interpretationId } = await interpret(text);
       cache.set(text, parsed);
       lastId = interpretationId;
+      lastParsed = parsed;
       return parsed;
     },
     async resolve(mention, alt) {

@@ -189,8 +189,9 @@ describe('onboarding', () => {
     await p.press('lang:uz-Latn');
     await p.text('/start');
     expect(p.last().text).toContain('Tilni tanlang');
+    // Biznes hali yo'q: oddiy matn biznes yaratishga yo'naltiradi (nom sifatida qabul qilinmaydi)
     await p.text('Salom');
-    expect(p.last().text).toContain('Tushunmadim');
+    expect(p.last().text).toBe('Avval biznes yarating: /start');
   });
 
   it('menyu: nom, rol, obuna holati, Mini App tugmasi va /invite ko‘rsatiladi', async () => {

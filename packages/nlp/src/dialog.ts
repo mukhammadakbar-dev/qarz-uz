@@ -18,6 +18,9 @@ import type { CustomerRef, Resolution } from './resolver.js';
 
 export interface PendingIntent {
   readonly intent: Intent;
+  /** Foydalanuvchi aytgan ism (normalizatsiyalangan va ko'rinish shakli): "Yangi mijoz" tanlovi uchun. */
+  readonly customer?: string | null;
+  readonly customerDisplay?: string | null;
   readonly amount: number | null;
   readonly amountKind: AmountKind;
   readonly fraction: readonly [number, number] | null;
@@ -49,10 +52,15 @@ export const IDLE: DialogState = { kind: 'IDLE' };
 
 export type DialogEvent =
   | { readonly type: 'text'; readonly text: string }
-  | { readonly type: 'button'; readonly id: 'other_amount' | 'pay_max' | 'cancel' }
+  | { readonly type: 'button'; readonly id: 'other_amount' | 'pay_max' | 'cancel' | 'new_customer' }
   | { readonly type: 'pick'; readonly index: number };
 
-export type ParsedIntent = StructuredIntent & { readonly multiAmount?: boolean };
+export type ParsedIntent = StructuredIntent & {
+  readonly multiAmount?: boolean;
+  readonly customerDisplay?: string | null;
+  /** Parser UNKNOWN qaytargan sabab (xabar matnini tanlash uchun). */
+  readonly reason?: string | undefined;
+};
 
 export interface DialogEnv {
   parse(text: string): ParsedIntent | Promise<ParsedIntent>;
@@ -119,6 +127,8 @@ function nextState(decision: Decision, pending: PendingIntent): DialogState {
 
 const toPending = (p: ParsedIntent): PendingIntent => ({
   intent: p.intent,
+  customer: p.customer,
+  customerDisplay: p.customerDisplay ?? null,
   amount: p.amount,
   amountKind: p.amountKind,
   fraction: p.fraction,
@@ -234,6 +244,28 @@ export async function step(
         decision,
         supersededPrevious: false,
       };
+    }
+    if (event.id === 'new_customer' && state.kind === 'AWAIT_CUSTOMER' && state.pending.customer) {
+      // Noaniq ro'yxatdan "Yangi mijoz": mavjudlardan hech biri emas (faqat nasiya yoki mijoz yaratish)
+      const p = state.pending;
+      if (p.intent === 'CREATE_PAYMENT')
+        return { state, decision: unknownDecision(), supersededPrevious: false };
+      const intent: Intent = p.intent === 'UNKNOWN' ? 'CREATE_CUSTOMER' : p.intent;
+      const decision = decide({
+        intent: {
+          intent,
+          customer: p.customer ?? null,
+          customerDisplay: p.customerDisplay ?? null,
+          amount: p.amount,
+          amountKind: p.amountKind,
+          fraction: p.fraction,
+          dateOffsetDays: p.dateOffsetDays,
+          multiAmount: false,
+        },
+        resolution: { kind: 'none' },
+        writable: env.writable,
+      });
+      return { state: nextState(decision, p), decision, supersededPrevious: false };
     }
     if (event.id === 'pay_max' && state.kind === 'REJECTED_OVERPAY') {
       const customer = await env.getCustomer(state.customerId);
@@ -394,5 +426,23 @@ async function continueWithCustomer(
     };
   }
   const decision = await evaluateForCustomer(pending, fresh, env);
+  return { state: nextState(decision, pending), decision, supersededPrevious: false };
+}
+
+/**
+ * Tasdiq paytida qoldiq o'zgargan (ADR-0003): shu qoralamani YANGI qoldiq bilan qayta baholaydi.
+ * FRACTION qismi saqlanmagan: oldingi summa ABSOLUTE sifatida qayta tekshiriladi (ortiqcha bo'lsa rad etiladi).
+ */
+export async function redecide(spec: DraftSpec, env: DialogEnv): Promise<StepResult> {
+  const pending: PendingIntent = {
+    intent: spec.type === 'PAYMENT' ? 'CREATE_PAYMENT' : 'CREATE_DEBT',
+    amount: spec.kind === 'FULL' ? null : spec.amount,
+    amountKind: spec.kind === 'FULL' ? 'FULL' : 'ABSOLUTE',
+    fraction: null,
+    dateOffsetDays: spec.dateOffsetDays,
+  };
+  const customer = spec.customerId ? await env.getCustomer(spec.customerId) : null;
+  if (!customer) return { state: IDLE, decision: unknownDecision(), supersededPrevious: false };
+  const decision = await evaluateForCustomer(pending, customer, env);
   return { state: nextState(decision, pending), decision, supersededPrevious: false };
 }

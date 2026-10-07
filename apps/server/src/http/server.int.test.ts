@@ -57,7 +57,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 beforeAll(async () => {
   pool = createPool(TEST_APP_URL, { max: 4 });
   const logger = createLogger(config, new Writable({ write: (_c, _e, cb) => cb() }));
-  bot = createBot({ config, logger, pool, botInfo });
+  bot = createBot({ config, logger, pool, handlers: false, botInfo });
   // Telegram'ga haqiqiy so'rov ketmaydi: chiquvchi API chaqiruvlari yig'iladi.
   bot.api.config.use(async (_prev, method, payload) => {
     sent.push({ method, payload: payload as Record<string, unknown> });

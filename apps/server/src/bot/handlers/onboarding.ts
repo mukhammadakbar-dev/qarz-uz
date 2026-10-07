@@ -84,7 +84,11 @@ async function businessName(deps: HandlerDeps, access: BusinessAccess): Promise<
   return memberships.find((m) => m.businessId === access.businessId)?.name ?? '';
 }
 
-async function showMenu(ctx: BotContext, deps: HandlerDeps, access: BusinessAccess): Promise<void> {
+export async function showMenu(
+  ctx: BotContext,
+  deps: HandlerDeps,
+  access: BusinessAccess,
+): Promise<void> {
   const [name, status] = await Promise.all([businessName(deps, access), loadStatus(deps, access)]);
   const lines = [
     ctx.t('menu.title', {
@@ -103,7 +107,7 @@ async function showMenu(ctx: BotContext, deps: HandlerDeps, access: BusinessAcce
 }
 
 /** Foydalanuvchi uchun "uy" ekrani: biznes bo'lmasa onboarding, bir nechta bo'lsa tanlash, aks holda menyu. */
-async function showHome(ctx: BotContext, deps: HandlerDeps): Promise<void> {
+export async function showHome(ctx: BotContext, deps: HandlerDeps): Promise<void> {
   try {
     const access = await resolveBusinessAccess(deps.pool, ctx.user);
     await showMenu(ctx, deps, access);

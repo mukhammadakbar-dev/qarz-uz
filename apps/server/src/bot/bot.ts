@@ -8,10 +8,16 @@ import { reportError } from '../observability/sentry.js';
 import { runWithContext, setContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { KeyedMutex } from '../util/keyed-mutex.js';
+import { registerAssistant } from './handlers/assistant.js';
 import { registerOnboarding } from './handlers/onboarding.js';
 
 /** Faqat kerakli update turlari (ADR-0006 §1). */
-export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const;
+export const ALLOWED_UPDATES = [
+  'message',
+  'edited_message',
+  'callback_query',
+  'my_chat_member',
+] as const;
 
 /** `user` identity middleware tomonidan har bir (private) update uchun o'rnatiladi. */
 export type BotContext = Context & {
@@ -26,6 +32,8 @@ export interface BotDeps {
   readonly pool: Pool;
   /** Berilsa `bot.init()` (getMe) chaqirilmaydi: testlar va tez ishga tushirish uchun. */
   readonly botInfo?: UserFromGetMe;
+  /** false: faqat umumiy qatlam (testlar o'z handlerini qo'shadi). Default true. */
+  readonly handlers?: boolean;
 }
 
 /**
@@ -102,12 +110,16 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   // `handleUpdate` xatoni bot.catch ga emas, chaqiruvchiga qaytaradi, shuning uchun chegara middleware sifatida.
   bot.catch(({ error }) => logger.error({ err: error }, 'bot.catch: kutilmagan xato'));
 
+  if (deps.handlers === false) return bot;
+
   registerOnboarding(bot, {
     config: deps.config,
     pool,
     logger,
     botUsername: () => bot.botInfo.username,
   });
+
+  registerAssistant(bot, { config: deps.config, pool, logger });
 
   return bot;
 }

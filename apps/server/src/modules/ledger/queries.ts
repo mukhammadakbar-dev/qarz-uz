@@ -121,10 +121,11 @@ export async function getHistory(
   pool: Pool,
   access: BusinessAccess,
   customerId: string,
-  options: { limit?: number; cursor?: string } = {},
+  options: { limit?: number; cursor?: string; beforeSeq?: number } = {},
 ): Promise<HistoryPage> {
   const limit = Math.min(Math.max(Math.trunc(options.limit ?? 20), 1), 100);
-  let before: string | null = null;
+  let before: string | null =
+    options.beforeSeq !== undefined ? String(Math.trunc(options.beforeSeq)) : null;
   if (options.cursor) {
     try {
       before = cursorSchema.parse(
@@ -272,3 +273,47 @@ export async function reconcileBalances(system: Pool, logger: Logger): Promise<B
   if (mismatches.length === 0) logger.info('balanslar ledger bilan mos');
   return mismatches;
 }
+
+export interface EntryDetail extends LedgerEntry {
+  readonly customerName: string;
+  readonly customerLabel: string | null;
+  readonly reversedBy: string | null;
+}
+
+/** Bitta yozuv (o'chirishni tasdiqlash oynasi uchun). Boshqa biznes yozuvi — NotFound. */
+export const getEntry = (
+  pool: Pool,
+  access: BusinessAccess,
+  entryId: string,
+): Promise<EntryDetail> =>
+  withBusiness(
+    pool,
+    access,
+    async (c) => {
+      if (!UUID.test(entryId)) throw new NotFoundError('Yozuv topilmadi');
+      const { rows } = await c.query<
+        Parameters<typeof toEntry>[0] & {
+          name: string;
+          label: string | null;
+          reversed_by: string | null;
+        }
+      >(
+        `SELECT ${ENTRY_COLUMNS.split(', ')
+          .map((col) => `e.${col}`)
+          .join(', ')}, c.name, c.label, r.id AS reversed_by
+           FROM ledger_entries e
+           JOIN customers c ON c.id = e.customer_id
+           LEFT JOIN ledger_entries r ON r.reverses_entry_id = e.id
+          WHERE e.id = $1`,
+        [entryId],
+      );
+      if (!rows[0]) throw new NotFoundError('Yozuv topilmadi');
+      return {
+        ...toEntry(rows[0]),
+        customerName: rows[0].name,
+        customerLabel: rows[0].label,
+        reversedBy: rows[0].reversed_by,
+      };
+    },
+    'ledger.history.view',
+  );
