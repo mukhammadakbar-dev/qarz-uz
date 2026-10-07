@@ -58,7 +58,13 @@ const envSchema = z
 
     // Billing (ADR-0005)
     SUPERADMIN_TELEGRAM_IDS: csvPositiveInts,
-    SUPPORT_TELEGRAM_USERNAME: optionalString,
+    // Admin kontakti (qo'lda to'lov): +998XXXXXXXXX. "To'lash" tugmasi https://t.me/+998... ga olib boradi.
+    SUPPORT_PHONE: optionalString.pipe(
+      z
+        .string()
+        .regex(/^\+998\d{9}$/, '+998XXXXXXXXX formatida bo‘lishi kerak')
+        .optional(),
+    ),
     SUBSCRIPTION_PRICE_UZS: z.coerce.number().int().positive().default(29000),
     TRIAL_DAYS: z.coerce.number().int().min(0).max(365).default(14),
 
@@ -126,7 +132,7 @@ export interface Config {
   };
   readonly billing: {
     readonly superadminTelegramIds: readonly number[];
-    readonly supportUsername: string | undefined;
+    readonly supportPhone: string | undefined;
     readonly priceUzs: number;
     readonly trialDays: number;
   };
@@ -180,7 +186,7 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
     }),
     billing: Object.freeze({
       superadminTelegramIds: Object.freeze([...e.SUPERADMIN_TELEGRAM_IDS]),
-      supportUsername: e.SUPPORT_TELEGRAM_USERNAME?.replace(/^@/, ''),
+      supportPhone: e.SUPPORT_PHONE,
       priceUzs: e.SUBSCRIPTION_PRICE_UZS,
       trialDays: e.TRIAL_DAYS,
     }),

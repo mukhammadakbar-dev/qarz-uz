@@ -98,11 +98,11 @@ describe('loadConfig', () => {
     expect(issuesOf({ ...valid, SUPERADMIN_TELEGRAM_IDS: '111,abc' })).not.toEqual([]);
   });
 
-  it('support username dan @ olib tashlanadi', () => {
-    expect(
-      loadConfig({ ...valid, SUPPORT_TELEGRAM_USERNAME: '@nasiya_support' }).billing
-        .supportUsername,
-    ).toBe('nasiya_support');
+  it('admin kontakti telefon formatida bo‘lishi shart', () => {
+    expect(loadConfig({ ...valid, SUPPORT_PHONE: '+998907900110' }).billing.supportPhone).toBe(
+      '+998907900110',
+    );
+    expect(issuesOf({ ...valid, SUPPORT_PHONE: '907900110' }).join()).toContain('SUPPORT_PHONE');
   });
 });
 

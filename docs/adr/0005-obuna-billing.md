@@ -62,7 +62,7 @@ new_paid_until = max(now, paid_until ?? now, trial_ends_at) + N oy
 
 - Owner'ga trial/obuna tugashiga **3 kun** va **1 kun** qolganda, hamda tugagan kuni.
 - Takror yubormaslik uchun `notification_key = {business_id}:{kind}:{paid_until|trial_ends_at}` ga unique.
-- Eslatmada "To‘lash" tugmasi admin kontaktiga (`SUPPORT_TELEGRAM_USERNAME`) olib boradi.
+- Eslatmada "To‘lash" tugmasi admin kontaktiga olib boradi: `SUPPORT_PHONE` (`+998…`) dan `https://t.me/+998…` havolasi quriladi, raqam xabarda matn sifatida ham ko‘rsatiladi.
 
 ## Keyinga qoldirilgan
 

@@ -65,7 +65,7 @@ COMMIT (xatoda ROLLBACK, draft PENDING holatiga qaytadi)
 
 ### Tartib
 
-- Bir chat ichida update'lar **ketma-ket** ishlanadi (`pg_advisory_xact_lock(hash(chat_id))`). Shunda tez ketma-ket yozilgan xabarlar ("Murodga yoz", "100 ming") to‘g‘ri tartibda ishlanadi.
+- Bir chat ichida update'lar **ketma-ket** ishlanadi. MVP'da jarayon ichidagi `KeyedMutex` (bitta PM2 jarayoni, ADR-0001); ikkinchi instance qo‘shilganda `pg_advisory_xact_lock(hash(chat_id))` ga o‘tiladi. Navbatga kirish dedupe'dan oldin sinxron bajariladi, shuning uchun tartib chatga kelish tartibiga teng. Shunda tez ketma-ket yozilgan xabarlar ("Murodga yoz", "100 ming") to‘g‘ri tartibda ishlanadi.
 - Webhook handler tezkor javob beradi. LLM chaqiruvi chat lock ichida, lekin 3 s timeout bilan.
 
 ### Hisob-kitob xatolari bo‘yicha
