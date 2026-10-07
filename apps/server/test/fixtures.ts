@@ -72,3 +72,21 @@ export async function revokeMember(
     ),
   );
 }
+
+/** Xom SQL bilan mijoz (servis qatlamisiz) — DB darajasidagi testlar uchun. */
+export async function insertCustomer(
+  pool: Pool,
+  businessId: string,
+  userId: string,
+  name = `Mijoz-${randomUUID().slice(0, 8)}`,
+  label: string | null = null,
+): Promise<string> {
+  const { rows } = await withTenant(pool, { businessId, userId }, (c) =>
+    c.query<{ id: string }>(
+      `INSERT INTO customers (business_id, name, normalized_name, label, normalized_label, created_by)
+       VALUES ($1, $2, lower($2), $3, lower($3), $4) RETURNING id`,
+      [businessId, name, label, userId],
+    ),
+  );
+  return rows[0]!.id;
+}

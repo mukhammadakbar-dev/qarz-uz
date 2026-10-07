@@ -84,8 +84,18 @@ Qoidalar:
 
 - `created_at` (server vaqti) va `occurred_at` (voqea sanasi) alohida.
 - `occurred_at ∈ [now − 365 kun, now]`. Kelajak sana rad etiladi.
-- **Tarix tartibi va "qoldiq" (running balance) `id` / `created_at` tartibida** hisoblanadi, `occurred_at` bo‘yicha emas. Shunda orqaga sanalangan yozuv o‘tgan qoldiqlarni "manfiy" qilib ko‘rsatmaydi. `occurred_at` faqat ko‘rsatiladigan sana.
+- **Tarix tartibi va "qoldiq" (running balance) `seq` (ketma-ket identity) tartibida** hisoblanadi, `occurred_at` bo‘yicha emas. Bir mijoz yozuvlari balans qatori lock’i ostida ketma-ket qo‘shiladi, shuning uchun `seq` tartibi commit tartibiga teng. Shunda orqaga sanalangan yozuv o‘tgan qoldiqlarni "manfiy" qilib ko‘rsatmaydi. `occurred_at` faqat ko‘rsatiladigan sana.
 - "Bugun" va "bugungi operatsiyalar" `businesses.timezone` (`Asia/Tashkent`) bo‘yicha hisoblanadi.
+
+### DB darajasidagi himoya (T2.1 da amalga oshirilgan)
+
+Invariantlar faqat ilovada emas, DB’ning o‘zida majburlanadi (24 ta xom-SQL test bilan isbotlangan):
+
+- `customer_balances` ga **hech bir ilova roli yoza olmaydi** (INSERT/UPDATE/DELETE grant yo‘q). Balans yagona yo‘l bilan o‘zgaradi: `ledger_entries` ga `AFTER INSERT` trigger (`SECURITY DEFINER`), ledger bilan bir tranzaksiyada.
+- `CHECK (balance >= 0)` buzilsa butun INSERT bekor bo‘ladi: ortiqcha to‘lov ilova xatosida ham yozilmaydi.
+- Storno: `reverses_entry_id` bo‘yicha `UNIQUE`; trigger stornoni stornolashni va noto‘g‘ri summani rad etadi; composite FK original bilan bir xil biznes/mijozni majburlaydi.
+- `ledger_entries.seq` (identity) — deterministik tartib; `delta` generated ustun.
+- Bir xil `(ism, yorliq)` faol mijozlar orasida takrorlanmaydi (partial unique indeks): bir xil ismli ikkinchi mijoz uchun yorliq majburiy.
 
 ### 9. Proyeksiya va reconciliation
 
