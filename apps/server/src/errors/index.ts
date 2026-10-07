@@ -13,6 +13,7 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'SUBSCRIPTION_EXPIRED'
   | 'OVERPAYMENT'
+  | 'BUSINESS_REQUIRED'
   | 'INTERNAL';
 
 export interface DomainErrorOptions {
@@ -65,6 +66,12 @@ export class NotFoundError extends DomainError {
 export class ConflictError extends DomainError {
   constructor(message: string, options?: DomainErrorOptions) {
     super('CONFLICT', 409, message, options);
+  }
+}
+/** Foydalanuvchi biznes tanlamagan yoki biznesi yo'q (onboarding yoki tanlash kerak). */
+export class BusinessRequiredError extends DomainError {
+  constructor(options?: DomainErrorOptions) {
+    super('BUSINESS_REQUIRED', 409, 'Avval biznesni tanlang', options);
   }
 }
 export class RateLimitedError extends DomainError {

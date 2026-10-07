@@ -19,11 +19,20 @@ import {
   type User,
 } from '../modules/identity/index.js';
 import { setContext } from '../observability/context.js';
+import {
+  listMemberships,
+  requirePermission,
+  resolveBusinessAccess,
+  type BusinessAccess,
+  type Permission,
+} from '../modules/tenancy/index.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
     /** `authenticate` preHandler o'rnatadi. */
     user?: User;
+    /** `requireBusiness` preHandler o'rnatadi (a'zolik server tomonida tasdiqlangan). */
+    access?: BusinessAccess;
   }
 }
 
@@ -48,6 +57,25 @@ export function createAuthenticate(deps: AuthDeps) {
     if (!user) throw new UnauthorizedError('Sessiya yaroqsiz, ilovani qayta oching');
     request.user = user;
     setContext({ userId: user.id });
+  };
+}
+
+/**
+ * Autentifikatsiya + aktiv biznes + (ixtiyoriy) permission. `X-Business-Id` faqat selector:
+ * a'zolik va rol har so'rovda DB'dan tekshiriladi.
+ */
+export function createRequireBusiness(deps: AuthDeps) {
+  const authenticate = createAuthenticate(deps);
+  return function requireBusiness(permission?: Permission) {
+    return async function requireBusinessHook(request: FastifyRequest): Promise<void> {
+      await authenticate(request);
+      const raw = request.headers['x-business-id'];
+      const selector = Array.isArray(raw) ? raw[0] : raw;
+      const access = await resolveBusinessAccess(deps.pool, request.user!, selector);
+      if (permission) requirePermission(access, permission);
+      request.access = access;
+      setContext({ businessId: access.businessId });
+    };
   };
 }
 
@@ -80,7 +108,13 @@ export function registerAuthRoutes<L extends FastifyBaseLogger>(
     return { token, expiresAt, user: publicUser(user) };
   });
 
-  app.get('/api/me', { preHandler: authenticate }, (request) => ({
-    user: publicUser(request.user!),
-  }));
+  app.get('/api/me', { preHandler: authenticate }, async (request) => {
+    const user = request.user!;
+    const memberships = await listMemberships(deps.pool, user.id);
+    return {
+      user: publicUser(user),
+      activeBusinessId: user.activeBusinessId,
+      businesses: memberships.map((m) => ({ id: m.businessId, name: m.name, role: m.role })),
+    };
+  });
 }

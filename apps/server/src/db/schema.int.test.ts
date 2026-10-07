@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TEST_APP_URL, TEST_MIGRATOR_URL, TEST_SYSTEM_URL } from '../../test/env.js';
+import * as fixtures from '../../test/fixtures.js';
 import { createPool } from './pool.js';
 import { withTenant } from './tenant.js';
 
@@ -19,37 +20,10 @@ afterAll(async () => {
 });
 
 const tokenHash = () => createHash('sha256').update(randomUUID()).digest('hex');
-let codeSeq = 0;
-const shortCode = () =>
-  `TD-${'ABCDEFGHJKLMNPQRSTUVWXYZ'[codeSeq % 24]}${'ABCDEFGHJK'[Math.floor(codeSeq / 24) % 10]}${String(2 + (codeSeq++ % 8))}K`;
-
-async function createUser(name = 'user'): Promise<string> {
-  const { rows } = await app.query<{ id: string }>(
-    'INSERT INTO users (telegram_user_id, first_name) VALUES ($1, $2) RETURNING id',
-    [Math.floor(Math.random() * 1e12), name],
-  );
-  return rows[0]!.id;
-}
-
-/** Onboarding oqimi: yangi biznes + OWNER + obuna bitta tranzaksiyada. */
-async function createBusiness(ownerId: string, name = 'Do‘kon') {
-  const businessId = randomUUID();
-  await withTenant(app, { businessId, userId: ownerId }, async (c) => {
-    await c.query(
-      'INSERT INTO businesses (id, name, short_code, owner_user_id) VALUES ($1, $2, $3, $4)',
-      [businessId, name, shortCode(), ownerId],
-    );
-    await c.query(
-      "INSERT INTO business_members (business_id, user_id, role) VALUES ($1, $2, 'OWNER')",
-      [businessId, ownerId],
-    );
-    await c.query(
-      "INSERT INTO subscriptions (business_id, trial_ends_at) VALUES ($1, now() + interval '14 days')",
-      [businessId],
-    );
-  });
-  return businessId;
-}
+const createUser = (name?: string) => fixtures.createUser(app, name);
+const createBusiness = (ownerId: string, name?: string) =>
+  fixtures.createBusiness(app, ownerId, name);
+const shortCode = fixtures.shortCode;
 
 async function pgCode(promise: Promise<unknown>): Promise<string | undefined> {
   try {
