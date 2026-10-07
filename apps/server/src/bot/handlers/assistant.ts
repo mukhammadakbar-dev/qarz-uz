@@ -50,13 +50,7 @@ import {
 } from '../../modules/tenancy/index.js';
 import type { Logger } from '../../observability/logger.js';
 import type { BotContext } from '../bot.js';
-import {
-  customerMenuButtons,
-  renderDecision,
-  type Button,
-  type Rendered,
-  type RenderContext,
-} from '../ui/render.js';
+import { renderDecision, type Button, type Rendered, type RenderContext } from '../ui/render.js';
 import { showHome } from './onboarding.js';
 
 const STATE_AWAIT_LABEL = 'AWAIT_LABEL';
