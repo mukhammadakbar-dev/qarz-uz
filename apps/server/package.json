@@ -4,10 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "migrate": "node --env-file-if-exists=../../.env --import tsx src/db/migrate-cli.ts"
   },
   "dependencies": {
     "@nasiya/shared": "workspace:*",
+    "pg": "^8.23.1",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15"
   }
 }

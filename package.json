@@ -9,12 +9,15 @@
   "scripts": {
     "lint": "oxlint",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "vitest run",
+    "test": "vitest run --project unit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test",
     "golden:build": "node packages/nlp-eval/build-golden.mjs",
-    "golden:validate": "node packages/nlp-eval/validate-golden.mjs"
+    "golden:validate": "node packages/nlp-eval/validate-golden.mjs",
+    "test:int": "vitest run --project int",
+    "db:up": "scripts/dev-db.sh up",
+    "migrate": "pnpm --filter @nasiya/server migrate"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
