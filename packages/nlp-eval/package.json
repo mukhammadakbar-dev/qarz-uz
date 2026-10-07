@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build-golden.mjs",
     "validate": "node validate-golden.mjs",
-    "eval": "node --import tsx eval.mjs"
+    "eval": "node --import tsx eval.mjs",
+    "eval:llm": "node --import tsx eval-llm.mjs"
   },
   "dependencies": {
     "@nasiya/shared": "workspace:*",

@@ -9,6 +9,17 @@ node packages/nlp-eval/validate-golden.mjs   # sxema, izchillik va qamrov tekshi
 
 `golden.jsonl` ni qo‘lda tahrirlamang: `handwritten.mjs` (qo‘lda holatlar) yoki `build-golden.mjs` (generator) ni o‘zgartirib qayta yig‘ing.
 
+## Baholash buyruqlari
+
+```bash
+pnpm --filter @nasiya/nlp-eval eval       # rule parser + resolver + policy + dialog (golden bo'yicha, kalit shart emas)
+GEMINI_API_KEY=... GEMINI_MODEL=... pnpm --filter @nasiya/nlp-eval eval:llm   # haqiqiy Gemini bilan MODEL TANLASH
+```
+
+`eval:llm` golden'ni uch yo'l bilan o'tkazadi (faqat rule, xom LLM, birlashtirilgan production yo'li) va birlashtirilgan
+natijada **WFT = 0** bo'lmasa xato bilan chiqadi. **Hozirgacha jonli Gemini bilan yurgizilmagan** (kalit yo'q edi):
+model nomini shu skript natijasiga qarab tanlang.
+
 ## Tarkib (v0)
 
 | Qism                  | Soni | Izoh                                                              |

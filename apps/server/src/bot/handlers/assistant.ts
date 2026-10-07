@@ -35,6 +35,7 @@ import { createCustomer, getCustomer, searchCustomers } from '../../modules/cust
 import {
   interpret,
   setOutcome,
+  type AiDeps,
   type InterpretationOutcome,
 } from '../../modules/interpretation/service.js';
 import {
@@ -61,6 +62,7 @@ export interface AssistantDeps {
   readonly config: Pick<Config, 'telegram' | 'billing'>;
   readonly pool: Pool;
   readonly logger: Logger;
+  readonly ai?: AiDeps | undefined;
 }
 
 const toKeyboard = (buttons: readonly (readonly Button[])[]): InlineKeyboard => {
@@ -127,7 +129,9 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
   }
 
   async function makeEnv(ctx: BotContext, access: BusinessAccess): Promise<AssistantEnv> {
-    return createAssistantEnv(pool, access, (text) => interpret({ pool, logger }, access, text));
+    return createAssistantEnv(pool, access, (text) =>
+      interpret({ pool, logger, ai: deps.ai }, access, text),
+    );
   }
 
   const reply = async (ctx: BotContext, rendered: Rendered): Promise<void> => {

@@ -46,9 +46,11 @@ PUBLIC_BASE_URL=https://<domen>
 SESSION_SECRET=<openssl rand -hex 32>
 SUPERADMIN_TELEGRAM_IDS=840369610
 SUPPORT_PHONE=+998907900110
+# GEMINI_API_KEY=...
+# GEMINI_MODEL=...
 ```
 
-Gemini (`GEMINI_API_KEY`, `GEMINI_MODEL`) va `SENTRY_DSN` Phase 3 / hardening bosqichida qo‘shiladi.
+Gemini ixtiyoriy: `GEMINI_API_KEY` + `GEMINI_MODEL` (+ `GEMINI_TIMEOUT_MS`, `GEMINI_DAILY_LIMIT`, `GEMINI_MODE`). Berilmasa bot faqat rule parser bilan ishlaydi. **Modelni jonli `eval:llm` natijasiga qarab tanlang.** `SYSTEM_DATABASE_URL` retention va reconciliation uchun kerak (bo‘lmasa ogohlantirish chiqadi). `SENTRY_DSN` hardening bosqichida.
 
 ## 4. Kod, nginx, TLS
 

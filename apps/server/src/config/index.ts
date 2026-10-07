@@ -71,6 +71,11 @@ const envSchema = z
     // AI (ADR-0004). Ikkalasi ham berilsa Gemini yoqiladi, aks holda faqat RuleProvider.
     GEMINI_API_KEY: optionalString,
     GEMINI_MODEL: optionalString,
+    GEMINI_TIMEOUT_MS: z.coerce.number().int().min(500).max(30000).default(3000),
+    // Biznes boshiga kunlik LLM chaqiruvlari chegarasi; oshsa faqat rule parser ishlaydi
+    GEMINI_DAILY_LIMIT: z.coerce.number().int().min(0).max(100000).default(300),
+    // always: har bir erkin matn (ADR-0004); fallback: faqat rule parser aniq natija bermaganda
+    GEMINI_MODE: z.enum(['always', 'fallback']).default('always'),
 
     SENTRY_DSN: optionalString.pipe(z.url().optional()),
   })
@@ -136,7 +141,17 @@ export interface Config {
     readonly priceUzs: number;
     readonly trialDays: number;
   };
-  readonly ai: { readonly gemini: { readonly apiKey: string; readonly model: string } | undefined };
+  readonly ai: {
+    readonly gemini:
+      | {
+          readonly apiKey: string;
+          readonly model: string;
+          readonly timeoutMs: number;
+          readonly dailyLimit: number;
+          readonly mode: 'always' | 'fallback';
+        }
+      | undefined;
+  };
   readonly sentryDsn: string | undefined;
 }
 
@@ -159,7 +174,13 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
   const production = e.NODE_ENV === 'production';
   const gemini =
     e.GEMINI_API_KEY && e.GEMINI_MODEL
-      ? { apiKey: e.GEMINI_API_KEY, model: e.GEMINI_MODEL }
+      ? {
+          apiKey: e.GEMINI_API_KEY,
+          model: e.GEMINI_MODEL,
+          timeoutMs: e.GEMINI_TIMEOUT_MS,
+          dailyLimit: e.GEMINI_DAILY_LIMIT,
+          mode: e.GEMINI_MODE,
+        }
       : undefined;
 
   return Object.freeze({
@@ -220,7 +241,11 @@ export function redactConfig(config: Config): Record<string, unknown> {
       ...config.billing,
       superadminTelegramIds: config.billing.superadminTelegramIds.length,
     },
-    ai: { gemini: config.ai.gemini ? { model: config.ai.gemini.model, apiKey: '***' } : undefined },
+    ai: {
+      gemini: config.ai.gemini
+        ? { model: config.ai.gemini.model, apiKey: '***', mode: config.ai.gemini.mode }
+        : undefined,
+    },
     sentryDsn: mask(config.sentryDsn),
   };
 }

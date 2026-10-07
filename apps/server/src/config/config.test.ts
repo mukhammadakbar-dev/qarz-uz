@@ -83,7 +83,13 @@ describe('loadConfig', () => {
   it('Gemini kaliti va modeli faqat birga beriladi', () => {
     expect(issuesOf({ ...valid, GEMINI_API_KEY: 'k' }).join()).toContain('GEMINI_MODEL');
     const c = loadConfig({ ...valid, GEMINI_API_KEY: 'k', GEMINI_MODEL: 'm' });
-    expect(c.ai.gemini).toEqual({ apiKey: 'k', model: 'm' });
+    expect(c.ai.gemini).toEqual({
+      apiKey: 'k',
+      model: 'm',
+      timeoutMs: 3000,
+      dailyLimit: 300,
+      mode: 'always',
+    });
   });
 
   it('bo‘sh qator berilgan ixtiyoriy o‘zgaruvchi "yo‘q" hisoblanadi', () => {

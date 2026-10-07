@@ -200,3 +200,12 @@ UNKNOWN
 
 - Gemini ishlamasa mahsulot to‘xtamaydi (rule fallback, qat'iyroq tasdiq).
 - Har bir AI chiqishi qo‘shimcha zod, grounding va resolver qatlamlaridan o‘tadi, shuning uchun LLM xatosi moliyaviy xatoga aylana olmaydi.
+
+## Amalga oshirish eslatmalari (Phase 3)
+
+- **Paket:** toza mantiq `@nasiya/nlp` da (DB'siz): `extractAmounts`, `parseRules`, `mergeIntents`, `resolveCustomer`, `decide`, `step` (dialog), `redactPii`. Server uni DB-asosidagi muhit (`createAssistantEnv`) bilan ishlatadi.
+- **Birlashtirish:** `mergeIntents` ADR §7–§8 ni amalga oshiradi. Qo‘shimcha qoidalar: rule'ning xavfsizlik rad etishlari (inkor, kelasi zamon, savol, yo‘nalish, o‘chirish, yaroqsiz belgilar, noto‘g‘ri nom) LLM tomonidan **bekor qilinmaydi** va bunday holatlarda LLM umuman chaqirilmaydi (`SKIP_LLM_REASONS`). Kelishmovchilikda: intent/mijoz/sana/summa turi farq qilsa UNKNOWN (`llm_conflict`), faqat summa farq qilsa summa so‘raladi, bir nechta summa bo‘lsa LLM ham tanlay olmaydi.
+- **Rejimlar:** `GEMINI_MODE=always` (default, har bir erkin matn) yoki `fallback` (faqat rule aniq bo‘lmaganda). Biznes boshiga kunlik chegara `GEMINI_DAILY_LIMIT` (jarayon xotirasida), `GEMINI_TIMEOUT_MS`, 1 marta qayta urinish, circuit breaker (5 ketma-ket xato → 60 s).
+- **Mijoz aniqlash:** aniq va yagona moslik avtomatik; prefiks, 1 harf xato (≥5 belgi) va ismga yopishgan noma’lum so‘z (`murod ber` → `murod`) **hech qachon** avtomatik tanlanmaydi. Yorliq aniq aytilsa (`murod aka`) shu ismli boshqa yorliqlar nomzod emas.
+- **Yangi mijoz nomi** foydalanuvchi yozgan ko‘rinishda (Kirill/Lotin, bosh harf bilan) saqlanadi (`customerDisplay`).
+- **Ma’lum cheklovlar:** (1) `-ga/-ka/-qa` bilan tugaydigan ismlar (`Olga`) dativ deb talqin qilinadi, `Olga 50 ming berdi` yo‘nalish noaniq bo‘lib so‘raladi (xavfsiz, lekin noqulay); (2) “yo‘nalish noaniq” holatida bot ikki tugma o‘rniga yo‘riqnoma matnini ko‘rsatadi; (3) rule parser golden bilan bir sessiyada yozilgan, haqiqiy ishonch pilotdan keladi; (4) Gemini jonli sinalmagan, model `eval:llm` natijasi bilan tanlanadi.

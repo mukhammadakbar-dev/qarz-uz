@@ -8,6 +8,7 @@ import { reportError } from '../observability/sentry.js';
 import { runWithContext, setContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { KeyedMutex } from '../util/keyed-mutex.js';
+import type { AiDeps } from '../modules/interpretation/service.js';
 import { registerAssistant } from './handlers/assistant.js';
 import { registerOnboarding } from './handlers/onboarding.js';
 
@@ -34,6 +35,8 @@ export interface BotDeps {
   readonly botInfo?: UserFromGetMe;
   /** false: faqat umumiy qatlam (testlar o'z handlerini qo'shadi). Default true. */
   readonly handlers?: boolean;
+  /** Gemini (ixtiyoriy). Berilmasa faqat rule parser ishlaydi. */
+  readonly ai?: AiDeps | undefined;
 }
 
 /**
@@ -119,7 +122,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     botUsername: () => bot.botInfo.username,
   });
 
-  registerAssistant(bot, { config: deps.config, pool, logger });
+  registerAssistant(bot, { config: deps.config, pool, logger, ai: deps.ai });
 
   return bot;
 }

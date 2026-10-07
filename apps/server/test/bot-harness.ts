@@ -8,6 +8,7 @@ import { loadConfig } from '../src/config/index.js';
 import { createPool } from '../src/db/pool.js';
 import { buildServer, WEBHOOK_PATH } from '../src/http/server.js';
 import { createLogger } from '../src/observability/logger.js';
+import type { AiDeps } from '../src/modules/interpretation/service.js';
 import { resolveBusinessAccess, type BusinessAccess } from '../src/modules/tenancy/index.js';
 import { TEST_APP_URL, TEST_SYSTEM_URL } from './env.js';
 
@@ -46,7 +47,9 @@ export interface Harness {
 let updateSeq = 40_000_000 + Math.floor(Math.random() * 1_000_000);
 let telegramSeq = 9_000_000_000 + Math.floor(Math.random() * 1_000_000);
 
-export async function createHarness(options: { miniAppUrl?: string } = {}): Promise<Harness> {
+export async function createHarness(
+  options: { miniAppUrl?: string; ai?: AiDeps } = {},
+): Promise<Harness> {
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'fatal',
@@ -64,6 +67,7 @@ export async function createHarness(options: { miniAppUrl?: string } = {}): Prom
     config,
     logger,
     pool,
+    ai: options.ai,
     botInfo: {
       id: 1,
       is_bot: true,

@@ -5,6 +5,9 @@ import { createPool } from './db/pool.js';
 import { buildServer } from './http/server.js';
 import { createLogger } from './observability/logger.js';
 import { initSentry } from './observability/sentry.js';
+import { createGeminiGenerate, createGeminiProvider } from './modules/interpretation/gemini.js';
+import { scheduleMaintenance } from './modules/maintenance/jobs.js';
+import { DailyBudget } from './util/resilience.js';
 
 const config = loadConfig(process.env);
 const logger = createLogger(config);
@@ -14,12 +17,46 @@ logger.info({ config: redactConfig(config) }, 'konfiguratsiya yuklandi');
 const pool = createPool(config.db.url, {
   onError: (error) => logger.error({ err: error }, 'pg pool xatosi'),
 });
-const bot = createBot({ config, logger, pool });
+const gemini = config.ai.gemini;
+const bot = createBot({
+  config,
+  logger,
+  pool,
+  ai: gemini
+    ? {
+        provider: createGeminiProvider({
+          generate: createGeminiGenerate(gemini.apiKey, gemini.model),
+          model: gemini.model,
+          timeoutMs: gemini.timeoutMs,
+        }),
+        budget: new DailyBudget(gemini.dailyLimit),
+        mode: gemini.mode,
+      }
+    : undefined,
+});
+logger.info(
+  { llm: gemini ? { model: gemini.model, mode: gemini.mode } : 'off' },
+  'interpretatsiya rejimi',
+);
 await bot.init();
 registerFallback(bot);
 const app = buildServer({ config, logger, pool, bot });
 
 await app.listen({ host: config.http.host, port: config.http.port });
+
+// Cross-tenant xizmat vazifalari (retention, muddati o'tgan qoralamalar, balans reconciliation): nasiya_system pool
+const systemPool = config.db.systemUrl
+  ? createPool(config.db.systemUrl, {
+      max: 2,
+      applicationName: 'nasiya-system',
+      onError: (error) => logger.error({ err: error }, 'pg system pool xatosi'),
+    })
+  : undefined;
+const stopMaintenance = systemPool ? scheduleMaintenance(systemPool, logger) : undefined;
+if (!systemPool)
+  logger.warn(
+    'SYSTEM_DATABASE_URL berilmagan: xizmat vazifalari (retention, reconciliation) ishlamaydi',
+  );
 
 if (config.telegram.mode === 'polling') {
   // Dev: webhook bo'lsa polling ishlamaydi, shuning uchun o'chiriladi.
@@ -39,8 +76,10 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
   force.unref();
   try {
     if (config.telegram.mode === 'polling') await bot.stop();
+    stopMaintenance?.();
     await app.close();
     await pool.end();
+    await systemPool?.end();
     await Sentry.flush(2000);
   } catch (error) {
     logger.error({ err: error }, 'to‘xtatishda xatolik');

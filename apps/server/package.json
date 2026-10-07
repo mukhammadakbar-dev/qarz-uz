@@ -15,14 +15,15 @@
     "migrate:prod": "node dist/migrate.js"
   },
   "dependencies": {
+    "@google/genai": "^2.27.0",
+    "@nasiya/nlp": "workspace:*",
     "@nasiya/shared": "workspace:*",
     "@sentry/node": "^11.4.0",
     "fastify": "^5.12.5",
     "grammy": "^1.46.0",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
-    "zod": "^4.6.5",
-    "@nasiya/nlp": "workspace:*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
