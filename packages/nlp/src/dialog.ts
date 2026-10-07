@@ -200,6 +200,20 @@ export async function step(
         supersededPrevious: false,
       };
     }
+    if (event.id === 'other_amount' && state.kind === 'REJECTED_OVERPAY') {
+      const customer = await env.getCustomer(state.customerId);
+      return {
+        state: {
+          kind: 'AWAIT_AMOUNT',
+          intent: 'CREATE_PAYMENT',
+          customerId: state.customerId,
+          newCustomerName: null,
+          dateOffsetDays: state.dateOffsetDays,
+        },
+        decision: { action: 'ASK_AMOUNT', intent: 'CREATE_PAYMENT', customer },
+        supersededPrevious: false,
+      };
+    }
     if (event.id === 'other_amount' && state.kind === 'AWAIT_CONFIRM') {
       const { draft } = state;
       const customer = draft.customerId ? await env.getCustomer(draft.customerId) : null;

@@ -19,3 +19,22 @@ export async function assertWritable(client: PoolClient, businessId: string): Pr
     throw new SubscriptionExpiredError({ details: { until: status.until.toISOString() } });
   }
 }
+
+import type { Pool } from 'pg';
+import { withTenant } from '../../db/tenant.js';
+
+/** Biznes hozir yozishga ruxsat beradimi (xabar/menyu ko'rsatish uchun; yakuniy tekshiruv servislarda). */
+export async function isBusinessWritable(
+  pool: Pool,
+  access: { businessId: string; userId: string },
+): Promise<boolean> {
+  try {
+    await withTenant(pool, { businessId: access.businessId, userId: access.userId }, (c) =>
+      assertWritable(c, access.businessId),
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof SubscriptionExpiredError) return false;
+    throw error;
+  }
+}

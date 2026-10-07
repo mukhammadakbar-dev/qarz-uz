@@ -31,6 +31,11 @@ export interface RuleResult extends StructuredIntent {
   readonly amountCandidates: readonly AmountCandidate[];
   /** Bir nechta har xil summa topildi (summa tanlanmadi). */
   readonly multiAmount: boolean;
+  /**
+   * Mijoz nomining foydalanuvchi yozgan KO'RINISHI (Kirill yoki Lotin, bosh harf bilan): yangi mijoz yaratishda
+   * ko'rsatiladigan nom. `customer` esa qidiruv uchun normalizatsiyalangan shakl.
+   */
+  readonly customerDisplay: string | null;
   /** Ism qo'shimchasi: dat (-ga), gen (-ning), ... Yo'nalishni aniqlash uchun. */
   readonly nameSuffix: 'dat' | 'gen' | 'abl' | 'acc' | 'loc' | null;
   /** Bu natija nima uchun UNKNOWN bo'lganini bildiradi (loglar/debug). */
@@ -56,6 +61,35 @@ function stripSuffix(token: string): { stem: string; kind: RuleResult['nameSuffi
   return { stem: token, kind: null };
 }
 
+const capitalize = (s: string): string => {
+  const lower = s.toLocaleLowerCase();
+  return lower.charAt(0).toLocaleUpperCase() + lower.slice(1);
+};
+
+/**
+ * Normalizatsiyalangan ism tokenlariga mos KIRISH tokenlarini topib, foydalanuvchi yozgan ko'rinishni qaytaradi.
+ * `suffixLength` — oxirgi tokendan kesilgan qo'shimcha uzunligi (Kirill va Lotin qo'shimchalari bir xil uzunlikda).
+ */
+function displayFromRaw(raw: string, nameTokens: readonly string[], suffixLength: number): string {
+  const rawTokens = raw
+    .split(/[\s,:\-–—()"«»]+/)
+    .map((t) => t.replace(/^[^\p{L}\p{N}'ʻʼ‘’`]+|[^\p{L}\p{N}'ʻʼ‘’`]+$/gu, ''))
+    .filter(Boolean);
+  const byNormalized = new Map<string, string>();
+  for (const t of rawTokens) {
+    const key = normalizeText(t);
+    if (!byNormalized.has(key)) byNormalized.set(key, t);
+  }
+  return nameTokens
+    .map((token, i) => {
+      let rawToken = byNormalized.get(token) ?? token;
+      if (i === nameTokens.length - 1 && suffixLength > 0)
+        rawToken = rawToken.slice(0, -suffixLength);
+      return capitalize(rawToken);
+    })
+    .join(' ');
+}
+
 const VALID_TOKEN = /^[\p{L}\p{N}']+(?:-[\p{L}\p{N}']+)*$/u;
 const HAS_ALNUM = /[\p{L}\p{N}]/u;
 const PHONE_RE =
@@ -77,6 +111,7 @@ const unknown = (
   normalized,
   amountCandidates: [],
   multiAmount: false,
+  customerDisplay: null,
   nameSuffix: null,
   reason,
   ...extra,
@@ -163,6 +198,7 @@ export function parseRules(rawText: string): RuleResult {
 
   let customer: string | null = null;
   let customerAlt: string | null = null;
+  let customerDisplay: string | null = null;
   let nameSuffix: RuleResult['nameSuffix'] = null;
   if (nameTokens.length > 0) {
     if (
@@ -178,6 +214,7 @@ export function parseRules(rawText: string): RuleResult {
     customer = [...head, stem].join(' ');
     customerAlt = kind ? [...head, last].join(' ') : null;
     nameSuffix = kind;
+    customerDisplay = displayFromRaw(rawText, nameTokens, kind ? last.length - stem.length : 0);
   }
 
   // 4) Summa
@@ -201,6 +238,7 @@ export function parseRules(rawText: string): RuleResult {
       intent: 'CREATE_CUSTOMER',
       customer,
       customerAlt,
+      customerDisplay,
       nameSuffix,
       ...(phone ? { phone } : {}),
       confidence: { intent: 0.95, customer: 0.9, amount: 0, date: 1 },
@@ -222,6 +260,7 @@ export function parseRules(rawText: string): RuleResult {
       intent: wantsHistory ? 'VIEW_CUSTOMER_HISTORY' : 'VIEW_CUSTOMER_BALANCE',
       customer,
       customerAlt,
+      customerDisplay,
       nameSuffix,
       confidence: { intent: 0.9, customer: 0.9, amount: 0, date: 1 },
       reason: undefined,
@@ -233,7 +272,12 @@ export function parseRules(rawText: string): RuleResult {
   if (!explicitVerb) {
     // Faqat ism ("Murod") — amal emas, mijoz tanlash/menyu uchun
     if (customer && candidates.length === 0) {
-      return unknown(normalized, 'bare_name', { customer, customerAlt, nameSuffix });
+      return unknown(normalized, 'bare_name', {
+        customer,
+        customerAlt,
+        customerDisplay,
+        nameSuffix,
+      });
     }
     if (!customer) return unknown(normalized, 'no_verb_no_name', { amountCandidates: candidates });
   }
@@ -294,6 +338,7 @@ export function parseRules(rawText: string): RuleResult {
     intent,
     customer,
     customerAlt,
+    customerDisplay,
     amount,
     amountKind,
     fraction,

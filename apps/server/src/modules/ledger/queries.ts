@@ -77,6 +77,27 @@ export const previewDebt = (
     'ledger.debt',
   );
 
+/**
+ * Idempotency kaliti bo'yicha yozuv (qoralama tasdig'ida qayta urinishni aniqlash uchun). Boshqa biznes kaliti ko'rinmaydi.
+ */
+export const findEntryByIdempotencyKey = (
+  pool: Pool,
+  access: BusinessAccess,
+  key: string,
+): Promise<LedgerEntry | undefined> =>
+  withBusiness(
+    pool,
+    access,
+    async (c) => {
+      const { rows } = await c.query<Parameters<typeof toEntry>[0]>(
+        `SELECT ${ENTRY_COLUMNS} FROM ledger_entries WHERE business_id = $1 AND idempotency_key = $2`,
+        [access.businessId, key],
+      );
+      return rows[0] ? toEntry(rows[0]) : undefined;
+    },
+    'ledger.history.view',
+  );
+
 // ───────── Tarix ─────────
 
 export interface HistoryItem extends LedgerEntry {

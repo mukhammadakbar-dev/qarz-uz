@@ -45,6 +45,10 @@ export interface Decision {
   readonly warnLarge?: boolean;
   /** Bir nechta har xil summa topilgan edi. */
   readonly multiAmount?: boolean;
+  /** FRACTION da: [surat, maxraj] (xabar matni uchun: yarmi, choragi...). */
+  readonly fraction?: readonly [number, number];
+  /** Topilmagan mijoz ismi (REJECT_UNKNOWN_CUSTOMER xabari uchun). */
+  readonly mention?: string;
   readonly draft?: DraftSpec;
 }
 
@@ -52,7 +56,7 @@ export interface PolicyInput {
   readonly intent: Pick<
     StructuredIntent,
     'intent' | 'customer' | 'amount' | 'amountKind' | 'fraction' | 'dateOffsetDays'
-  > & { readonly multiAmount?: boolean };
+  > & { readonly multiAmount?: boolean; readonly customerDisplay?: string | null };
   /** Mijoz ko'rsatilmagan bo'lsa null. */
   readonly resolution: Resolution | null;
   /** Obuna yozishga ruxsat beradimi (EXPIRED emas). */
@@ -83,7 +87,7 @@ export function decide(input: PolicyInput): Decision {
       resolution?.kind === 'resolved' ||
       (resolution?.kind === 'ambiguous' && resolution.exactCount > 0);
     return none('CREATE_CUSTOMER_FLOW', {
-      newCustomerName: i.customer ?? '',
+      newCustomerName: i.customerDisplay ?? i.customer ?? '',
       ...(exists ? { askLabel: true } : {}),
     });
   }
@@ -110,17 +114,19 @@ export function decide(input: PolicyInput): Decision {
   const isView = i.intent === 'VIEW_CUSTOMER_BALANCE' || i.intent === 'VIEW_CUSTOMER_HISTORY';
 
   if (resolution.kind === 'none') {
-    if (isView || i.intent === 'CREATE_PAYMENT') return none('REJECT_UNKNOWN_CUSTOMER');
-    // CREATE_DEBT: yangi mijoz (tasdiq bilan)
+    if (isView || i.intent === 'CREATE_PAYMENT')
+      return none('REJECT_UNKNOWN_CUSTOMER', { mention: i.customer });
+    // CREATE_DEBT: yangi mijoz (tasdiq bilan). Nom — foydalanuvchi yozgan ko'rinishda.
+    const newName = i.customerDisplay ?? i.customer;
     if (i.amountKind === 'NONE' || i.amount === null)
-      return none('ASK_AMOUNT', { newCustomerName: i.customer });
+      return none('ASK_AMOUNT', { newCustomerName: newName });
     if (!validAmount(i.amount)) return none('REJECT_INVALID_AMOUNT');
     return withDraft(
       {
         ...base,
         action: 'CONFIRM_NEW_CUSTOMER',
         customer: null,
-        newCustomerName: i.customer,
+        newCustomerName: newName,
         amount: i.amount,
         balanceBefore: 0,
         balanceAfter: i.amount,
@@ -129,7 +135,7 @@ export function decide(input: PolicyInput): Decision {
       {
         type: 'DEBT',
         customerId: null,
-        newCustomerName: i.customer,
+        newCustomerName: newName,
         amount: i.amount,
         dateOffsetDays: i.dateOffsetDays,
         expectedBalance: 0,
@@ -181,6 +187,7 @@ export function decide(input: PolicyInput): Decision {
   let amount: number;
   let kind: DraftKind;
   let action: Action;
+  let fractionUsed: readonly [number, number] | undefined;
   if (i.amountKind === 'FULL') {
     amount = balance;
     kind = 'FULL';
@@ -191,6 +198,7 @@ export function decide(input: PolicyInput): Decision {
     if (amount <= 0) return { ...known, action: 'REJECT_INVALID_AMOUNT' };
     kind = 'FRACTION';
     action = 'CONFIRM_FRACTION';
+    fractionUsed = i.fraction;
   } else {
     amount = i.amount!;
     kind = 'ABSOLUTE';
@@ -208,7 +216,14 @@ export function decide(input: PolicyInput): Decision {
     };
   }
   return withDraft(
-    { ...known, action, amount, balanceBefore: balance, balanceAfter: balance - amount },
+    {
+      ...known,
+      action,
+      amount,
+      balanceBefore: balance,
+      balanceAfter: balance - amount,
+      ...(fractionUsed ? { fraction: fractionUsed } : {}),
+    },
     {
       type: 'PAYMENT',
       customerId: customer.id,

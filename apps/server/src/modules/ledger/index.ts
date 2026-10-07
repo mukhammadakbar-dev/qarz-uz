@@ -1,5 +1,6 @@
 export {
   findBalanceMismatches,
+  findEntryByIdempotencyKey,
   getBalance,
   getBusinessSummary,
   getHistory,

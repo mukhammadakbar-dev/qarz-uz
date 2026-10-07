@@ -113,3 +113,24 @@ describe('parseRules: golden dataset’da bo‘lmagan holatlar', () => {
     }
   });
 });
+
+describe('customerDisplay: foydalanuvchi yozgan ko‘rinish', () => {
+  const display = (t: string) => p(t).customerDisplay;
+  it('Kirill va Lotin yozuvi saqlanadi, bosh harf bilan', () => {
+    expect(display('Мурод 450 минг')).toBe('Мурод');
+    expect(display('муродга 50 000 yoz')).toBe('Мурод');
+    expect(display('MUROD 50 ming')).toBe('Murod');
+    expect(display('murodbekka 450 ming yoz')).toBe('Murodbek');
+    expect(display('Муродбекка 450 минг ёз')).toBe('Муродбек');
+  });
+
+  it('ko‘p so‘zli ism va apostrof', () => {
+    expect(display('Ali Valiyev 50 ming berdi')).toBe('Ali Valiyev');
+    expect(display('G‘ayrat 50 ming')).toBe('G‘ayrat');
+    expect(display('Ғайратга 50 минг ёз')).toBe('Ғайрат');
+  });
+
+  it('ism yo‘q bo‘lsa null', () => {
+    expect(display('50 ming berdi')).toBeNull();
+  });
+});
