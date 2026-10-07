@@ -29,7 +29,7 @@ State javoblari (`100 ming`, `Birinchisi`, tugma bosish) `conversation_state` bo
 Yagona funksiya: interpreter, resolver, qidiruv va `customers.normalized_name` uchun.
 
 1. Unicode NFC.
-2. Apostrof variantlari (`ʻ ʼ ‘ ’ ` ´` va h.k.) bitta ASCII `'` ga.
+2. Apostrof variantlari (`ʻ ʼ ‘ ’ ` ´`va h.k.) bitta ASCII`'` ga.
 3. Kirill → Lotin transliteratsiya (o‘zbek kirill alifbosi):
    `а→a б→b в→v г→g д→d е→e (so‘z boshida ye) ё→yo ж→j з→z и→i й→y к→k л→l м→m н→n о→o п→p р→r с→s т→t у→u ф→f х→x ц→ts ч→ch ш→sh ъ→' ы→i э→e ю→yu я→ya ў→o' қ→q ғ→g' ҳ→h`
 4. Lowercase.
@@ -41,20 +41,23 @@ Yagona funksiya: interpreter, resolver, qidiruv va `customers.normalized_name` u
 
 ```ts
 type Intent =
-  | 'CREATE_DEBT' | 'CREATE_PAYMENT'
-  | 'VIEW_CUSTOMER_BALANCE' | 'VIEW_CUSTOMER_HISTORY'
-  | 'CREATE_CUSTOMER' | 'UNKNOWN';
+  | 'CREATE_DEBT'
+  | 'CREATE_PAYMENT'
+  | 'VIEW_CUSTOMER_BALANCE'
+  | 'VIEW_CUSTOMER_HISTORY'
+  | 'CREATE_CUSTOMER'
+  | 'UNKNOWN';
 
 type AmountKind = 'ABSOLUTE' | 'FULL' | 'FRACTION' | 'NONE';
 
 interface StructuredIntent {
   intent: Intent;
-  customer: string | null;          // normalizatsiyalangan ism (qo‘shimchasiz)
-  amount: number | null;            // faqat ABSOLUTE da, butun so‘m
+  customer: string | null; // normalizatsiyalangan ism (qo‘shimchasiz)
+  amount: number | null; // faqat ABSOLUTE da, butun so‘m
   amount_kind: AmountKind;
   fraction: [number, number] | null; // faqat FRACTION da, masalan [1, 2]
-  date_offset_days: number;          // 0 = bugun, -1 = kecha; faqat ≤ 0
-  phone?: string;                    // faqat RuleProvider chiqaradi
+  date_offset_days: number; // 0 = bugun, -1 = kecha; faqat ≤ 0
+  phone?: string; // faqat RuleProvider chiqaradi
   confidence: { intent: number; customer: number; amount: number; date: number }; // 0..1
 }
 ```
@@ -67,7 +70,7 @@ interface StructuredIntent {
 ```ts
 interface AIProvider {
   readonly name: string;
-  readonly version: string;                       // model / prompt versiyasi
+  readonly version: string; // model / prompt versiyasi
   interpret(msg: NormalizedMessage, ctx: InterpretContext): Promise<StructuredIntent>;
 }
 ```
@@ -88,11 +91,11 @@ interface AIProvider {
 
 ### 6. PII redaction (LLM'ga yuborishdan oldin)
 
-| Nima | Qanday |
-|---|---|
+| Nima                                                                                                   | Qanday                      |
+| ------------------------------------------------------------------------------------------------------ | --------------------------- |
 | Telefon raqam: `+998…` / `998…` prefiksi bilan, yoki `XX XXX XX XX` kabi bo‘shliq/tire guruhlari bilan | `<PHONE>` ga almashtiriladi |
-| Karta raqami (13–19 raqam, Luhn) | `<CARD>` ga almashtiriladi |
-| Email, URL | `<REDACTED>` |
+| Karta raqami (13–19 raqam, Luhn)                                                                       | `<CARD>` ga almashtiriladi  |
+| Email, URL                                                                                             | `<REDACTED>`                |
 
 - Ism va summa yuboriladi (Q4).
 - Redaction **summalarni buzmasligi shart**: `900 000`, `1 200 000`, `50000`, `1.200.000` va prefiksiz oddiy 9 xonali son (`900000000`) telefon deb tanilmaydi. Oxirgisi 900 mln summa sifatida talqin qilinadi va baribir `WARN_LARGE_AMOUNT` + tasdiqdan o‘tadi. Buni test va golden set (`redaction-safety` teglari) tasdiqlaydi.
@@ -100,16 +103,17 @@ interface AIProvider {
 
 ### 7. Birlashtirish: Rule ∩ LLM
 
-| Rule | LLM | Natija |
-|---|---|---|
-| Intent, mijoz va summa bir xil | bir xil | **High** confidence |
-| Rule aniq, LLM `UNKNOWN`/xato/timeout | — | Rule natijasi, **Medium** (savol yoki tasdiq qat'iyroq) |
-| Rule `UNKNOWN`, LLM aniq | — | LLM natijasi, faqat grounding o‘tsa; aks holda `UNKNOWN` |
-| Intent yoki summa **farq qiladi** | — | **Low**: clarification (`ASK_*`), hech narsa taxmin qilinmaydi |
+| Rule                                  | LLM     | Natija                                                         |
+| ------------------------------------- | ------- | -------------------------------------------------------------- |
+| Intent, mijoz va summa bir xil        | bir xil | **High** confidence                                            |
+| Rule aniq, LLM `UNKNOWN`/xato/timeout | —       | Rule natijasi, **Medium** (savol yoki tasdiq qat'iyroq)        |
+| Rule `UNKNOWN`, LLM aniq              | —       | LLM natijasi, faqat grounding o‘tsa; aks holda `UNKNOWN`       |
+| Intent yoki summa **farq qiladi**     | —       | **Low**: clarification (`ASK_*`), hech narsa taxmin qilinmaydi |
 
 ### 8. Grounding (LLM chiqishini asosga tekshirish)
 
 LLM natijasi quyidagilar bajarilsa qabul qilinadi:
+
 - `amount` matndan rule parser topgan summalar to‘plamidan biri bo‘lishi shart. LLM "o‘ylab chiqargan" summa rad etiladi.
 - `customer` normalizatsiyalangan matnning qismi (qo‘shimchasiz) bo‘lishi shart.
 - `date_offset_days ≤ 0` va `≥ −365`.
@@ -123,8 +127,8 @@ Bajarilmasa: low confidence, natija `UNKNOWN` yoki `ASK_*`.
 2. **Bir nechta turli summa** (`Murod 50 ming berdi 100 ming`) → summa tanlanmaydi (`amount = null`, `NONE`), `ASK_AMOUNT`.
 3. **Summa yo‘q:** `Murodga yoz` → `ASK_AMOUNT`. `Murod pul berdi` → `ASK_AMOUNT` (TT §16 medium).
 4. **Faqat ism** (`Murod`) → `intent = UNKNOWN`, `customer = "murod"`: moliyaviy harakat bajarilmaydi (TT §16 low). Resolver ishlaydi: bitta mijoz → `SHOW_CUSTOMER_MENU` (qoldiq va [Nasiya][To‘lov][Tarix] tugmalari, hech narsa yozilmaydi); bir nechta → `ASK_CUSTOMER` (TT §13); topilmasa → `UNKNOWN`. `customer` faqat shu "faqat ism" holatida `UNKNOWN` bilan birga to‘ldiriladi, boshqa `UNKNOWN`larda `null`.
-4a. **Yo‘nalish:** `Murodga 50 ming berdim` (men berdim) → `CREATE_DEBT`. `Murod 50 ming berdi` (u berdi) → `CREATE_PAYMENT`. `Murodga 50 ming berdi` (yo‘nalish noaniq) → `UNKNOWN`, `ASK` ikki tugma bilan: [Nasiya yozish] [To‘lov yozish].
-4b. **Zamon va inkor:** kelasi zamon (`beradi`, `to‘laydi`, `bermoqchi`, `berishi kerak`), inkor (`bermadi`, `to‘lamadi`) va savol (`berdimi?`) moliyaviy operatsiya **emas** → `UNKNOWN`, draft yaratilmaydi.
+   4a. **Yo‘nalish:** `Murodga 50 ming berdim` (men berdim) → `CREATE_DEBT`. `Murod 50 ming berdi` (u berdi) → `CREATE_PAYMENT`. `Murodga 50 ming berdi` (yo‘nalish noaniq) → `UNKNOWN`, `ASK` ikki tugma bilan: [Nasiya yozish] [To‘lov yozish].
+   4b. **Zamon va inkor:** kelasi zamon (`beradi`, `to‘laydi`, `bermoqchi`, `berishi kerak`), inkor (`bermadi`, `to‘lamadi`) va savol (`berdimi?`) moliyaviy operatsiya **emas** → `UNKNOWN`, draft yaratilmaydi.
 5. **Manfiy yoki nol summa** → `REJECT_INVALID_AMOUNT`. `> 10 mlrd` → `REJECT_INVALID_AMOUNT`. `≥ 50 mln` → `WARN_LARGE_AMOUNT`.
 6. **`FULL` (qarzini berdi, pulini berdi):** summa joriy qoldiq; **har doim** tasdiq (`CONFIRM_FULL`), summa ko‘rsatiladi (TT §9). Qoldiq 0 bo‘lsa `REJECT_NO_DEBT`.
 7. **`FRACTION` (yarmini berdi):** `floor(balance × n / d)`, so‘mga **pastga** yaxlitlanadi (to‘lov hech qachon qoldiqdan oshmaydi). Natija `0` bo‘lsa `REJECT_INVALID_AMOUNT`. Har doim `CONFIRM_FRACTION`.
@@ -136,13 +140,13 @@ Bajarilmasa: low confidence, natija `UNKNOWN` yoki `ASK_*`.
 
 Qidiruv `customers.normalized_name` bo‘yicha, faqat `ACTIVE`, faqat joriy `business_id`:
 
-| Holat | Natija |
-|---|---|
-| Bitta **aniq** moslik (`normalized_name == mention`) | Mijoz aniqlandi (tasdiqda baribir ko‘rsatiladi) |
-| ≥2 aniq moslik | `ASK_CUSTOMER` (label bilan ajratilgan tugmalar) |
-| Faqat prefix/fuzzy moslik (`murod` ↔ `murodbek`) | `ASK_CUSTOMER` (nomzodlar + "+ Yangi mijoz") |
-| Prefix + aniq moslik birga | `ASK_CUSTOMER` (aniq moslik birinchi, lekin avto tanlanmaydi) |
-| Hech kim | `CREATE_DEBT`: `CONFIRM_NEW_CUSTOMER`; `CREATE_PAYMENT`: `REJECT_UNKNOWN_CUSTOMER` |
+| Holat                                                | Natija                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Bitta **aniq** moslik (`normalized_name == mention`) | Mijoz aniqlandi (tasdiqda baribir ko‘rsatiladi)                                    |
+| ≥2 aniq moslik                                       | `ASK_CUSTOMER` (label bilan ajratilgan tugmalar)                                   |
+| Faqat prefix/fuzzy moslik (`murod` ↔ `murodbek`)     | `ASK_CUSTOMER` (nomzodlar + "+ Yangi mijoz")                                       |
+| Prefix + aniq moslik birga                           | `ASK_CUSTOMER` (aniq moslik birinchi, lekin avto tanlanmaydi)                      |
+| Hech kim                                             | `CREATE_DEBT`: `CONFIRM_NEW_CUSTOMER`; `CREATE_PAYMENT`: `REJECT_UNKNOWN_CUSTOMER` |
 
 > **TT §12:** noto‘g‘ri mijoz tanlash false negative'dan xavfliroq. Shubha bo‘lsa — savol.
 

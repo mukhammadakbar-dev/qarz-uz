@@ -1,0 +1,13 @@
+{
+  "name": "@nasiya/nlp-eval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build-golden.mjs",
+    "validate": "node validate-golden.mjs"
+  },
+  "dependencies": {
+    "@nasiya/shared": "workspace:*"
+  }
+}

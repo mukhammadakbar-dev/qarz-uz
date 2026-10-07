@@ -3,7 +3,7 @@
 // Ishga tushirish: node packages/nlp-eval/build-golden.mjs
 // Generator tasodifiy emas: bir xil kod = bir xil fayl (diff'da ko‘rinadi).
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handwritten } from './handwritten.mjs';
@@ -32,10 +32,10 @@ const names = [
   ['Shahzod', 'Шаҳзод', 'shahzod'],
   ['Feruza', 'Феруза', 'feruza'],
   ['Sanjar', 'Санжар', 'sanjar'],
-  ['G\'ayrat', 'Ғайрат', 'g\'ayrat'],
-  ['O\'tkir', 'Ўткир', 'o\'tkir'],
+  ["G'ayrat", 'Ғайрат', "g'ayrat"],
+  ["O'tkir", 'Ўткир', "o'tkir"],
 ];
-const apostrophes = ['\'', 'ʻ', '‘', '’', '`'];
+const apostrophes = ["'", 'ʻ', '‘', '’', '`'];
 
 // ── Summalar: [Lotin, Kirill, qiymat] ──
 const amounts = [
@@ -70,8 +70,16 @@ const amounts = [
 ];
 
 // ── Fe'llar: [Lotin, Kirill] ──
-const debtVerbs = [['yoz', 'ёз'], ['yozing', 'ёзинг'], ['yozib qo‘y', 'ёзиб қўй']];
-const payVerbs = [['berdi', 'берди'], ['to‘ladi', 'тўлади'], ['qaytardi', 'қайтарди']];
+const debtVerbs = [
+  ['yoz', 'ёз'],
+  ['yozing', 'ёзинг'],
+  ['yozib qo‘y', 'ёзиб қўй'],
+];
+const payVerbs = [
+  ['berdi', 'берди'],
+  ['to‘ladi', 'тўлади'],
+  ['qaytardi', 'қайтарди'],
+];
 const nasiya = ['nasiya', 'насия'];
 
 // ── Skript rejimlari: [ism, summa, fe'l] ──
@@ -123,7 +131,7 @@ for (let i = 0; generated.length < N && i < N * 4; i++) {
   const verbScript = mode[2];
 
   let nameStr = nameScript === 'L' ? nameLat : nameCyr;
-  if (nameScript === 'L' && nameLat.includes('\'')) {
+  if (nameScript === 'L' && nameLat.includes("'")) {
     nameStr = nameLat.replace(/'/g, apostrophes[i % apostrophes.length]);
   }
   const nameDat = nameStr + dativeSuffix(nameStr, nameScript);
@@ -166,14 +174,30 @@ for (let i = 0; generated.length < N && i < N * 4; i++) {
 }
 
 // Qo‘lda yozilganlar hammasi `expect` ni to‘liq qilib to‘ldiriladi, ID beriladi.
-const all = [...handwritten.map((c) => ({ ...c, src: 'hw' })), ...generated.map((c) => ({ ...c, src: 'gen' }))];
+const all = [
+  ...handwritten.map((c) => ({ ...c, src: 'hw' })),
+  ...generated.map((c) => ({ ...c, src: 'gen' })),
+];
 const counters = { hw: 0, gen: 0 };
 const lines = all.map((c) => {
   counters[c.src]++;
   const id = `${c.src === 'hw' ? 'HW' : 'GEN'}-${String(counters[c.src]).padStart(4, '0')}`;
-  const { src, ...rest } = c;
+  const { src: _src, ...rest } = c;
   return JSON.stringify({ id, ...rest });
 });
 
-writeFileSync(join(here, 'golden.jsonl'), lines.join('\n') + '\n');
-console.log(`golden.jsonl: ${lines.length} holat (qo‘lda: ${counters.hw}, generatsiya: ${counters.gen})`);
+const out = join(here, 'golden.jsonl');
+const content = lines.join('\n') + '\n';
+if (process.argv.includes('--check')) {
+  // CI: golden.jsonl generatordan chiqqan natijaga teng ekanini tekshiradi (qo‘lda tahrir qilinmagan).
+  if (readFileSync(out, 'utf8') !== content) {
+    console.error('golden.jsonl eskirgan: `pnpm golden:build` ni ishga tushiring.');
+    process.exit(1);
+  }
+  console.log(`golden.jsonl yangi (${lines.length} holat)`);
+} else {
+  writeFileSync(out, content);
+  console.log(
+    `golden.jsonl: ${lines.length} holat (qo‘lda: ${counters.hw}, generatsiya: ${counters.gen})`,
+  );
+}

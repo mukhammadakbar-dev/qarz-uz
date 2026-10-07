@@ -21,11 +21,11 @@ businesses.short_code -- masalan TD-4F7K, owner adminga shuni aytadi
 
 ### Holat (hisoblanadi, saqlanmaydi)
 
-| Shart | Holat |
-|---|---|
-| `now < trial_ends_at` | `TRIAL` |
-| `now < paid_until` | `ACTIVE` |
-| aks holda | `EXPIRED` |
+| Shart                 | Holat     |
+| --------------------- | --------- |
+| `now < trial_ends_at` | `TRIAL`   |
+| `now < paid_until`    | `ACTIVE`  |
+| aks holda             | `EXPIRED` |
 
 `ACTIVE` ham `TRIAL` ham ruxsat beradi. Ikkalasi tugagan bo‘lsa `EXPIRED`.
 

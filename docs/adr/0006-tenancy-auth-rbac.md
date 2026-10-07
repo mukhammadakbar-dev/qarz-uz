@@ -12,12 +12,14 @@ Qarz ma'lumotlari moliyaviy va maxfiy. Business A ma'lumotlari Business B foydal
 ### 1. Autentifikatsiya
 
 **Bot:**
+
 - Webhook `X-Telegram-Bot-Api-Secret-Token` sarlavhasi bilan tekshiriladi (doimiy vaqtli taqqoslash). Mos kelmasa `401`, javobsiz.
 - Foydalanuvchi `message.from.id` / `callback_query.from.id` dan olinadi. Matn ichidagi ID ga ishonilmaydi.
 - Faqat `private` chat. Guruh va kanal update'lari o‘tkazib yuboriladi.
 - `allowed_updates = ["message", "callback_query", "my_chat_member"]`.
 
 **Mini App:**
+
 - Klient `initData` yuboradi. Server uni bot tokenidan olingan HMAC bilan tekshiradi, `auth_date` ≤ 24 soat (sozlanadi).
 - Muvaffaqiyatda server qisqa muddatli (masalan 1 soat) session token beradi. Token faqat `user_id` ni o‘z ichiga oladi. **Biznes va rol token ichida emas**, har so‘rovda DB'dan o‘qiladi.
 - Token cookie'da emas, `Authorization: Bearer`. CORS faqat Mini App domeniga.
@@ -39,16 +41,16 @@ Har bir so‘rov: `identity → membership(user, business, status=ACTIVE) → pe
 
 Permission'lar kodda (`permissions.ts`) belgilangan, rol → permission to‘plami. Keyinchalik DB'ga ko‘chirish mumkin (TT §3.2).
 
-| Permission | OWNER | STAFF |
-|---|:-:|:-:|
-| `customer.create`, `customer.update`, `customer.view` | ✔ | ✔ |
-| `ledger.debt`, `ledger.payment` | ✔ | ✔ |
-| `ledger.history.view` (butun tarix) | ✔ | ✔ |
-| `ledger.entry.delete` (storno) | ✔ | ✔ |
-| `ledger.adjustment` | ✔ | — |
-| `customer.archive`, `customer.unarchive` | ✔ | — |
-| `staff.manage` (taklif, revoke) | ✔ | — |
-| `business.settings`, `billing.view` | ✔ | — |
+| Permission                                            | OWNER | STAFF |
+| ----------------------------------------------------- | :---: | :---: |
+| `customer.create`, `customer.update`, `customer.view` |   ✔   |   ✔   |
+| `ledger.debt`, `ledger.payment`                       |   ✔   |   ✔   |
+| `ledger.history.view` (butun tarix)                   |   ✔   |   ✔   |
+| `ledger.entry.delete` (storno)                        |   ✔   |   ✔   |
+| `ledger.adjustment`                                   |   ✔   |   —   |
+| `customer.archive`, `customer.unarchive`              |   ✔   |   —   |
+| `staff.manage` (taklif, revoke)                       |   ✔   |   —   |
+| `business.settings`, `billing.view`                   |   ✔   |   —   |
 
 OWNER'ni o‘zi o‘chira olmaydi va biznesda kamida bitta ACTIVE OWNER qoladi.
 
@@ -65,6 +67,7 @@ OWNER'ni o‘zi o‘chira olmaydi va biznesda kamida bitta ACTIVE OWNER qoladi.
 **Qatlam 1: ilova.** Hamma repository funksiyalari `businessId`'ni **majburiy** parametr sifatida oladi. `businessId` tipi branded (`BusinessId`), faqat membership-tekshirilgan kontekstdan olinadi. SQL'da har doim `WHERE business_id = $1`.
 
 **Qatlam 2: PostgreSQL RLS.**
+
 - Barcha tenant jadvallarida `ENABLE` va `FORCE ROW LEVEL SECURITY`.
 - Policy: `USING (business_id = current_setting('app.business_id', true)::uuid)`.
 - Har tranzaksiya boshida `SET LOCAL app.business_id = $1`. O‘rnatilmasa, hech narsa ko‘rinmaydi (fail-closed).

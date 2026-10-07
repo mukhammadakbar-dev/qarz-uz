@@ -1,0 +1,12 @@
+{
+  "name": "@nasiya/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nasiya/shared": "workspace:*"
+  }
+}

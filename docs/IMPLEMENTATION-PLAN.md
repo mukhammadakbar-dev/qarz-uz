@@ -8,18 +8,18 @@
 
 ## 0. Qabul qilingan qarorlar (ADR qisqacha)
 
-| # | Mavzu | Qaror |
-|---|---|---|
-| Q1 | Ortiqcha to‘lov | **Hech qachon bo‘lmaydi — rad etiladi.** Invariant: `balance >= 0` har doim. DB darajasida ham majburlanadi. |
-| Q2 | Staff huquqlari | Staff **butun tarixni ko‘radi** va yozuvni **o‘chira oladi**. TT §3.2 dagi "faqat o‘z operatsiyalari" cheklovi bekor. |
-| Q3 | "O‘chirish" semantikasi | Ledger o‘zgarmas: o‘chirish = **storno** (teskari yozuv). Yozuv tarixda "o‘chirilgan" deb ko‘rinadi, balansga ta'sir qilmaydi. |
-| Q4 | AI | **Gemini API** (MVP). Ism va summa yuboriladi; telefon/karta/ortiqcha PII redaksiya qilinadi. LLM faqat intent qaytaradi. `AIProvider` abstraksiyasi saqlanadi (keyin Qwen/local). |
-| Q5 | Stack | **TypeScript + Fastify + grammY**, PostgreSQL 16, React+Vite Mini App. Deploy: **VPS + PM2 + Nginx**. |
-| Q6 | Obuna | **14 kun bepul trial**, keyin **29 000 so‘m/oy**, to‘lov boshida **qo‘lda** (Telegramda admin orqali). Online gateway — keyin. |
-| Q7 | Repo | Noldan qayta quriladi; eski `qarz-*` kod ishlatilmaydi. |
-| — | Pul birligi | `BIGINT`, **butun so‘m** (tiyin yo‘q). Float hech qayerda. |
-| — | Vaqt zonasi | `Asia/Tashkent` (biznes darajasida saqlanadi). |
-| — | Tasdiqlash | MVP'da **har qanday** moliyaviy yozuv faqat tugma bosilgandan keyin yoziladi (TT §16 "minimal confirmation" ham tugma). |
+| #   | Mavzu                   | Qaror                                                                                                                                                                              |
+| --- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Ortiqcha to‘lov         | **Hech qachon bo‘lmaydi — rad etiladi.** Invariant: `balance >= 0` har doim. DB darajasida ham majburlanadi.                                                                       |
+| Q2  | Staff huquqlari         | Staff **butun tarixni ko‘radi** va yozuvni **o‘chira oladi**. TT §3.2 dagi "faqat o‘z operatsiyalari" cheklovi bekor.                                                              |
+| Q3  | "O‘chirish" semantikasi | Ledger o‘zgarmas: o‘chirish = **storno** (teskari yozuv). Yozuv tarixda "o‘chirilgan" deb ko‘rinadi, balansga ta'sir qilmaydi.                                                     |
+| Q4  | AI                      | **Gemini API** (MVP). Ism va summa yuboriladi; telefon/karta/ortiqcha PII redaksiya qilinadi. LLM faqat intent qaytaradi. `AIProvider` abstraksiyasi saqlanadi (keyin Qwen/local). |
+| Q5  | Stack                   | **TypeScript + Fastify + grammY**, PostgreSQL 16, React+Vite Mini App. Deploy: **VPS + PM2 + Nginx**.                                                                              |
+| Q6  | Obuna                   | **14 kun bepul trial**, keyin **29 000 so‘m/oy**, to‘lov boshida **qo‘lda** (Telegramda admin orqali). Online gateway — keyin.                                                     |
+| Q7  | Repo                    | Noldan qayta quriladi; eski `qarz-*` kod ishlatilmaydi.                                                                                                                            |
+| —   | Pul birligi             | `BIGINT`, **butun so‘m** (tiyin yo‘q). Float hech qayerda.                                                                                                                         |
+| —   | Vaqt zonasi             | `Asia/Tashkent` (biznes darajasida saqlanadi).                                                                                                                                     |
+| —   | Tasdiqlash              | MVP'da **har qanday** moliyaviy yozuv faqat tugma bosilgandan keyin yoziladi (TT §16 "minimal confirmation" ham tugma).                                                            |
 
 ### Qo‘shimcha qarorlar (2026-10-07 da tasdiqlangan)
 
@@ -34,11 +34,11 @@
 
 ### 1.1. Qatlamlar
 
-| Qatlam | Savoli | Xato qilishi mumkinmi |
-|---|---|---|
-| Interpreter (Gemini + rule parser) | "User nimani nazarda tutdi?" | Ha — faqat taxmin |
-| Decision policy (toza funksiya) | "Bajarish xavfsizmi, nima so‘rash kerak?" | Yo‘q — exhaustive testlangan |
-| Ledger service (tranzaksion) | "Atomik, yagona marta, invariantlar bilan yoz" | Yo‘q — DB constraint'lar bilan himoyalangan |
+| Qatlam                             | Savoli                                         | Xato qilishi mumkinmi                       |
+| ---------------------------------- | ---------------------------------------------- | ------------------------------------------- |
+| Interpreter (Gemini + rule parser) | "User nimani nazarda tutdi?"                   | Ha — faqat taxmin                           |
+| Decision policy (toza funksiya)    | "Bajarish xavfsizmi, nima so‘rash kerak?"      | Yo‘q — exhaustive testlangan                |
+| Ledger service (tranzaksion)       | "Atomik, yagona marta, invariantlar bilan yoz" | Yo‘q — DB constraint'lar bilan himoyalangan |
 
 ### 1.2. Tuzilma (pnpm monorepo)
 
@@ -107,15 +107,15 @@ Modullar bir-biriga faqat public service interfeysi orqali murojaat qiladi.
   - Klient yuborgan `business_id`/`customer_id` faqat selector; server har safar membership bilan tekshiradi.
 - **RBAC:** permission map kodda saqlanadi va kengaytiriladi.
 
-| Permission | OWNER | STAFF |
-|---|---|---|
-| customer.create / update / view | ✔ | ✔ |
-| ledger.debt / payment | ✔ | ✔ |
-| ledger.history.view (butun) | ✔ | ✔ |
-| ledger.entry.delete (storno) | ✔ | ✔ |
-| ledger.adjustment (qo‘lda ±) | ✔ | — |
-| customer.archive | ✔ | — |
-| staff.manage, business.settings, billing.view | ✔ | — |
+| Permission                                    | OWNER | STAFF |
+| --------------------------------------------- | ----- | ----- |
+| customer.create / update / view               | ✔     | ✔     |
+| ledger.debt / payment                         | ✔     | ✔     |
+| ledger.history.view (butun)                   | ✔     | ✔     |
+| ledger.entry.delete (storno)                  | ✔     | ✔     |
+| ledger.adjustment (qo‘lda ±)                  | ✔     | —     |
+| customer.archive                              | ✔     | —     |
+| staff.manage, business.settings, billing.view | ✔     | —     |
 
 - **Superadmin:** `SUPERADMIN_TELEGRAM_IDS` env orqali beriladi. Faqat billing buyruqlariga ruxsati bor, biznes ma'lumotlarini ko‘ra olmaydi.
 
@@ -156,6 +156,7 @@ xabar
 - **`AIProvider` interfeysi:** `interpret(message, context) → StructuredIntent`. Implementatsiyalar: `RuleProvider`, `GeminiProvider`; keyin `QwenProvider`/local.
 
 **Resolver:**
+
 - bitta aniq moslik → mijoz aniqlandi (tasdiq oynasida baribir ko‘rsatiladi);
 - ≥2 moslik, yoki faqat prefix/fuzzy moslik ("Murod" vs "Murodbek") → **savol beriladi**, tugmalar va "+ Yangi mijoz" bilan;
 - moslik yo‘q: DEBT uchun "Yangi mijoz yaratilsinmi?", PAYMENT uchun rad etiladi.
@@ -220,14 +221,14 @@ idempotency_keys   (key, user_id, request_hash, response JSONB, created_at)
 
 TT §25 modeliga qo‘shimchalar va sabablari:
 
-| Qo‘shimcha | Sabab |
-|---|---|
-| `occurred_at` | "kecha yozgan edim" |
-| `idempotency_key` | §28 |
-| `reverses_entry_id` | o‘chirish (storno) |
-| `label` | §12 "Мурод — qo‘shni" |
-| `locale` | §19 |
-| `short_code`, `subscriptions` | billing |
+| Qo‘shimcha                    | Sabab                 |
+| ----------------------------- | --------------------- |
+| `occurred_at`                 | "kecha yozgan edim"   |
+| `idempotency_key`             | §28                   |
+| `reverses_entry_id`           | o‘chirish (storno)    |
+| `label`                       | §12 "Мурод — qo‘shni" |
+| `locale`                      | §19                   |
+| `short_code`, `subscriptions` | billing               |
 
 ---
 
@@ -383,15 +384,15 @@ Parallel: NLP (T2.3, T3.1–T3.4) ‖ Ledger (T2.1–T2.9) ‖ Mini App UI (T4.3
 
 ## 5. Acceptance criteria → testlar
 
-| AC | Tekshiruv |
-|---|---|
-| AC-01 Debt | T3.14: input → tasdiq → aynan 1 ta `DEBT 450000` |
-| AC-02 Payment | T3.14 + T2.9: balans 250000 |
-| AC-03 Full | T3.7: `CONFIRM_FULL`; tasdiqsiz ledger'da 0 ta yozuv |
-| AC-04 Mixed | T3.1: 3 input → bir xil intent |
-| AC-05 Duplicate | T2.9 + T3.14: takroriy update va ikki marta "Saqlash" → 1 ta yozuv |
-| AC-06 Tenant | T2.9 + T4.6 + RLS |
-| AC-07 Ambiguous | T3.6/T3.7: ≥2 kandidat → `ASK_CUSTOMER` |
-| Q1 Overpay | T2.9 + T3.14: qarzdan katta to‘lov hech qanday yo‘l bilan yozilmaydi (parallel holatda ham) |
-| Q3 Delete | T2.9: storno, takroriy o‘chirish va balans < 0 holatlari |
-| Q6 Billing | T5.3 |
+| AC              | Tekshiruv                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| AC-01 Debt      | T3.14: input → tasdiq → aynan 1 ta `DEBT 450000`                                            |
+| AC-02 Payment   | T3.14 + T2.9: balans 250000                                                                 |
+| AC-03 Full      | T3.7: `CONFIRM_FULL`; tasdiqsiz ledger'da 0 ta yozuv                                        |
+| AC-04 Mixed     | T3.1: 3 input → bir xil intent                                                              |
+| AC-05 Duplicate | T2.9 + T3.14: takroriy update va ikki marta "Saqlash" → 1 ta yozuv                          |
+| AC-06 Tenant    | T2.9 + T4.6 + RLS                                                                           |
+| AC-07 Ambiguous | T3.6/T3.7: ≥2 kandidat → `ASK_CUSTOMER`                                                     |
+| Q1 Overpay      | T2.9 + T3.14: qarzdan katta to‘lov hech qanday yo‘l bilan yozilmaydi (parallel holatda ham) |
+| Q3 Delete       | T2.9: storno, takroriy o‘chirish va balans < 0 holatlari                                    |
+| Q6 Billing      | T5.3                                                                                        |

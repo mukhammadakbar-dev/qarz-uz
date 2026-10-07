@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": ["error", "smart"],
+    "typescript/no-explicit-any": "error"
+  },
+  "ignorePatterns": ["node_modules", "dist", "coverage", "packages/nlp-eval/golden.jsonl"],
+  "overrides": [
+    {
+      "files": ["packages/nlp-eval/*.mjs"],
+      "rules": { "no-console": "off" }
+    }
+  ]
+}

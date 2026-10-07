@@ -1,0 +1,26 @@
+{
+  "name": "nasiya",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test",
+    "golden:build": "node packages/nlp-eval/build-golden.mjs",
+    "golden:validate": "node packages/nlp-eval/validate-golden.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "oxlint": "^1.87.0",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

@@ -5,9 +5,10 @@
 
 ## Kontekst
 
-Ledger moliyaviy haqiqat manbai. Asosiy tamoyil (TT §50): *LLM noto‘g‘ri tushunishi mumkin, ledger noto‘g‘ri bo‘lishi mumkin emas.*
+Ledger moliyaviy haqiqat manbai. Asosiy tamoyil (TT §50): _LLM noto‘g‘ri tushunishi mumkin, ledger noto‘g‘ri bo‘lishi mumkin emas._
 
 TT'ga nisbatan qabul qilingan o‘zgarishlar:
+
 1. **§29 (ortiqcha to‘lov ruxsat etiladi)** o‘rniga: ortiqcha to‘lov **hech qachon** yozilmaydi (Q1).
 2. **§3.2 (staff faqat o‘z operatsiyalarini ko‘radi)** o‘rniga: staff butun tarixni ko‘radi va yozuvni o‘chira oladi (Q2).
 3. **§23 formulasi** `SUM(DEBT) − SUM(PAYMENT) + SUM(ADJUSTMENT)` generated ustun `delta` orqali ifodalanadi (ekvivalent).
@@ -23,11 +24,11 @@ TT'ga nisbatan qabul qilingan o‘zgarishlar:
 
 ### 2. Yozuv turlari va ishora
 
-| `type` | `amount` | `delta` |
-|---|---|---|
-| `DEBT` | `> 0` | `+amount` |
-| `PAYMENT` | `> 0` | `−amount` |
-| `ADJUSTMENT` | `≠ 0` (ishorali) | `amount` |
+| `type`       | `amount`         | `delta`   |
+| ------------ | ---------------- | --------- |
+| `DEBT`       | `> 0`            | `+amount` |
+| `PAYMENT`    | `> 0`            | `−amount` |
+| `ADJUSTMENT` | `≠ 0` (ishorali) | `amount`  |
 
 `delta` generated ustun (`GENERATED ALWAYS AS (CASE …) STORED`). Balans: `SUM(delta)`. Bu TT §8 dagi `PAYMENT −200000` yozuviga ekvivalent: ilovada va hisobotlarda `delta` ko‘rsatiladi.
 
@@ -60,6 +61,7 @@ storno:    ADJUSTMENT  amount=-450000 delta=-450000  reverses_entry_id=<original
 ```
 
 Qoidalar:
+
 - `reverses_entry_id` ustida `UNIQUE` indeks: bitta yozuv faqat bir marta o‘chiriladi.
 - Storno yozuvining o‘zini o‘chirib bo‘lmaydi (`reverses_entry_id IS NOT NULL` bo‘lsa rad).
 - `amount_storno = −original.delta`, shu sababli `PAYMENT`ni o‘chirish `+`, `DEBT`ni o‘chirish `−` yozuv bo‘ladi.

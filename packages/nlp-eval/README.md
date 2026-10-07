@@ -11,10 +11,10 @@ node packages/nlp-eval/validate-golden.mjs   # sxema, izchillik va qamrov tekshi
 
 ## Tarkib (v0)
 
-| Qism | Soni | Izoh |
-|---|---|---|
-| Qo‘lda (`HW-*`) | ~230 | TT §46, §6, §20, AC-01…07, xavfsizlik, kontekstli va ko‘p qadamli |
-| Generatsiya (`GEN-*`) | 170 | 22 ism × 28 summa shakli × 5 skript rejimi × shablonlar |
+| Qism                  | Soni | Izoh                                                              |
+| --------------------- | ---- | ----------------------------------------------------------------- |
+| Qo‘lda (`HW-*`)       | ~230 | TT §46, §6, §20, AC-01…07, xavfsizlik, kontekstli va ko‘p qadamli |
+| Generatsiya (`GEN-*`) | 170  | 22 ism × 28 summa shakli × 5 skript rejimi × shablonlar           |
 
 Skript rejimlari (`mode-XYZ`: ism, summa, fe'l; `L` = Lotin, `C` = Kirill):
 `LLL`, `CCC`, `LCL` (`Murod 50 минг berdi`), `CLL` (`Мурод 50 ming berdi`), `LLC`.
@@ -24,35 +24,59 @@ Skript rejimlari (`mode-XYZ`: ism, summa, fe'l; `L` = Lotin, `C` = Kirill):
 Har bir qator — bitta holat. Uch ko‘rinish:
 
 **1. Kontekstsiz (interpreter darajasi):**
+
 ```json
-{"id":"HW-0008","tags":["tt46"],"input":"Murod 50 ming berdi",
- "expect":{"intent":"CREATE_PAYMENT","customer":"murod","amount":50000,"amount_kind":"ABSOLUTE","fraction":null,"date_offset_days":0}}
+{
+  "id": "HW-0008",
+  "tags": ["tt46"],
+  "input": "Murod 50 ming berdi",
+  "expect": {
+    "intent": "CREATE_PAYMENT",
+    "customer": "murod",
+    "amount": 50000,
+    "amount_kind": "ABSOLUTE",
+    "fraction": null,
+    "date_offset_days": 0
+  }
+}
 ```
 
 **2. Kontekst bilan (resolver + decision policy):** `context.customers` (`name`, `balance`, ixtiyoriy `label`, `archived`), ixtiyoriy `context.subscription` (`EXPIRED`) va `expect.action`.
+
 ```json
-{"id":"HW-0190","input":"Murod 150 ming berdi","context":{"customers":[{"name":"Murod","balance":100000}]},
- "no_draft":true,"expect":{"intent":"CREATE_PAYMENT","customer":"murod","amount":150000,"amount_kind":"ABSOLUTE",
- "action":"REJECT_OVERPAY","max_payable":100000}}
+{
+  "id": "HW-0190",
+  "input": "Murod 150 ming berdi",
+  "context": { "customers": [{ "name": "Murod", "balance": 100000 }] },
+  "no_draft": true,
+  "expect": {
+    "intent": "CREATE_PAYMENT",
+    "customer": "murod",
+    "amount": 150000,
+    "amount_kind": "ABSOLUTE",
+    "action": "REJECT_OVERPAY",
+    "max_payable": 100000
+  }
+}
 ```
 
 **3. Ko‘p qadamli (`turns`):** har bir qadam `input` (matn) yoki `button` (`other_amount`, `pay_max`, `save`, `cancel`) va `expect.action`.
 
 ### `expect` maydonlari
 
-| Maydon | Ma'nosi |
-|---|---|
-| `intent` | `CREATE_DEBT`, `CREATE_PAYMENT`, `VIEW_CUSTOMER_BALANCE`, `VIEW_CUSTOMER_HISTORY`, `CREATE_CUSTOMER`, `UNKNOWN` |
-| `customer` | normalize qilingan ism (Lotin, lowercase, ASCII `'`, qo‘shimchasiz) yoki `null`. `UNKNOWN` da faqat "faqat ism" (`bare-name`) holatida to‘ldiriladi |
-| `amount` | butun so‘m yoki `null`. `FULL`/`FRACTION`/`NONE` da doim `null` |
-| `amount_kind` | `ABSOLUTE`, `FULL`, `FRACTION`, `NONE` |
-| `fraction` | `[n, d]`, faqat `FRACTION` da |
-| `date_offset_days` | `0` = bugun, `-1` = kecha. Hech qachon kelajak emas |
-| `phone` | faqat `CREATE_CUSTOMER`, `+998XXXXXXXXX` |
-| `action` | DecisionPolicy natijasi (ADR-0004 §11). Faqat kontekstli holatlarda |
-| `pay_amount`, `balance_after`, `max_payable`, `candidate_count`, `ask_label`, `resolved_label` | action bilan bog‘liq qo‘shimcha kutilgan qiymatlar |
-| `no_draft` (case darajasida) | Hech qanday draft (`CONFIRM*`, `WARN_LARGE_AMOUNT`) yaratilmasligi **shart** |
-| `group` (case darajasida) | Bir guruhdagi barcha holatlar **aynan bir xil** `expect` bergan bo‘lishi shart (AC-04, TT §20) |
+| Maydon                                                                                         | Ma'nosi                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intent`                                                                                       | `CREATE_DEBT`, `CREATE_PAYMENT`, `VIEW_CUSTOMER_BALANCE`, `VIEW_CUSTOMER_HISTORY`, `CREATE_CUSTOMER`, `UNKNOWN`                                     |
+| `customer`                                                                                     | normalize qilingan ism (Lotin, lowercase, ASCII `'`, qo‘shimchasiz) yoki `null`. `UNKNOWN` da faqat "faqat ism" (`bare-name`) holatida to‘ldiriladi |
+| `amount`                                                                                       | butun so‘m yoki `null`. `FULL`/`FRACTION`/`NONE` da doim `null`                                                                                     |
+| `amount_kind`                                                                                  | `ABSOLUTE`, `FULL`, `FRACTION`, `NONE`                                                                                                              |
+| `fraction`                                                                                     | `[n, d]`, faqat `FRACTION` da                                                                                                                       |
+| `date_offset_days`                                                                             | `0` = bugun, `-1` = kecha. Hech qachon kelajak emas                                                                                                 |
+| `phone`                                                                                        | faqat `CREATE_CUSTOMER`, `+998XXXXXXXXX`                                                                                                            |
+| `action`                                                                                       | DecisionPolicy natijasi (ADR-0004 §11). Faqat kontekstli holatlarda                                                                                 |
+| `pay_amount`, `balance_after`, `max_payable`, `candidate_count`, `ask_label`, `resolved_label` | action bilan bog‘liq qo‘shimcha kutilgan qiymatlar                                                                                                  |
+| `no_draft` (case darajasida)                                                                   | Hech qanday draft (`CONFIRM*`, `WARN_LARGE_AMOUNT`) yaratilmasligi **shart**                                                                        |
+| `group` (case darajasida)                                                                      | Bir guruhdagi barcha holatlar **aynan bir xil** `expect` bergan bo‘lishi shart (AC-04, TT §20)                                                      |
 
 ## Metrikalar (T3.1 eval harness shularni hisoblaydi)
 

@@ -1,0 +1,4 @@
+pnpm-lock.yaml
+packages/nlp-eval/golden.jsonl
+packages/nlp-eval/handwritten.mjs
+docs/Texnik-Topshiriq.md
