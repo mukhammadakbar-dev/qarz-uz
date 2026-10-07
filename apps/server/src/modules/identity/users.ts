@@ -88,3 +88,7 @@ export async function findUserById(pool: Pool, id: string): Promise<User | undef
   const { rows } = await pool.query<UserRow>(`SELECT ${COLUMNS} FROM users WHERE id = $1`, [id]);
   return rows[0] ? toUser(rows[0]) : undefined;
 }
+
+export async function setLocale(pool: Pool, userId: string, locale: Locale): Promise<void> {
+  await pool.query('UPDATE users SET locale = $2 WHERE id = $1', [userId, locale]);
+}

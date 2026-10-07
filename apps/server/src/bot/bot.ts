@@ -2,27 +2,31 @@ import { Bot, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import type { Pool } from 'pg';
 import type { Config } from '../config/index.js';
+import { t as translate, type MessageKey, type Params } from '../i18n/index.js';
 import { upsertTelegramUser, type User } from '../modules/identity/index.js';
 import { reportError } from '../observability/sentry.js';
 import { runWithContext, setContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { KeyedMutex } from '../util/keyed-mutex.js';
+import { registerOnboarding } from './handlers/onboarding.js';
 
 /** Faqat kerakli update turlari (ADR-0006 §1). */
 export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const;
 
 /** `user` identity middleware tomonidan har bir (private) update uchun o'rnatiladi. */
-export type BotContext = Context & { user: User };
+export type BotContext = Context & {
+  user: User;
+  /** Foydalanuvchi tilida matn (locale o'zgarsa darhol hisobga olinadi). */
+  t: (key: MessageKey, params?: Params) => string;
+};
 
 export interface BotDeps {
-  readonly config: Pick<Config, 'telegram'>;
+  readonly config: Pick<Config, 'telegram' | 'billing'>;
   readonly logger: Logger;
   readonly pool: Pool;
   /** Berilsa `bot.init()` (getMe) chaqirilmaydi: testlar va tez ishga tushirish uchun. */
   readonly botInfo?: UserFromGetMe;
 }
-
-const GENERIC_ERROR = 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko‘ring.';
 
 /**
  * Hamma update uchun umumiy qatlam (handlerlar undan keyin ro'yxatdan o'tadi):
@@ -51,7 +55,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       logger.error({ err: error }, 'update ishlovida xatolik');
       reportError(error);
       try {
-        await ctx.reply(GENERIC_ERROR);
+        // ctx.t identity qatlamidan oldin xato bo'lsa mavjud emas: Lotin matniga tushamiz
+        await ctx.reply(translate(ctx.user?.locale ?? 'uz-Latn', 'error.generic'));
       } catch (replyError) {
         logger.warn({ err: replyError }, 'xato haqida xabar yuborib bo‘lmadi');
       }
@@ -89,6 +94,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const from = ctx.from;
     if (!from || from.is_bot) return;
     ctx.user = await upsertTelegramUser(pool, from);
+    ctx.t = (key, params) => translate(ctx.user.locale, key, params);
     setContext({ userId: ctx.user.id });
     await next();
   });
@@ -96,5 +102,20 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   // `handleUpdate` xatoni bot.catch ga emas, chaqiruvchiga qaytaradi, shuning uchun chegara middleware sifatida.
   bot.catch(({ error }) => logger.error({ err: error }, 'bot.catch: kutilmagan xato'));
 
+  registerOnboarding(bot, {
+    config: deps.config,
+    pool,
+    logger,
+    botUsername: () => bot.botInfo.username,
+  });
+
   return bot;
+}
+
+/**
+ * Eng oxirgi handler: boshqa hech kim ushlamagan matn. Hozircha tabiiy matn tahlili yo'q
+ * (Phase 3, interpretatsiya shu o'rinni egallaydi). Testlar o'z handlerlarini avval ro'yxatdan o'tkazadi.
+ */
+export function registerFallback(bot: Bot<BotContext>): void {
+  bot.on('message:text', (ctx) => ctx.reply(ctx.t('fallback.unknown')));
 }

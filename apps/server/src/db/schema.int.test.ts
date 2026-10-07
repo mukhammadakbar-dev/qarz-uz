@@ -344,7 +344,9 @@ describe('redeem_invite (ADR-0006 §5)', () => {
   it('yaroqli token: staff ulanadi, token bir martalik', async () => {
     const staff = await createUser('staff');
     const hash = await invite();
-    expect(await redeem(hash, staff)).toEqual([{ out_business_id: biz, out_role: 'STAFF' }]);
+    expect(await redeem(hash, staff)).toEqual([
+      { out_business_id: biz, out_role: 'STAFF', out_joined: true },
+    ]);
     const m = await withTenant(app, { businessId: biz, userId: owner }, (c) =>
       c.query('SELECT role, status FROM business_members WHERE user_id = $1', [staff]),
     );
@@ -374,7 +376,7 @@ describe('redeem_invite (ADR-0006 §5)', () => {
       ),
     );
     expect(await redeem(await invite(), staff)).toEqual([
-      { out_business_id: biz, out_role: 'STAFF' },
+      { out_business_id: biz, out_role: 'STAFF', out_joined: true },
     ]);
     const m = await withTenant(app, { businessId: biz, userId: owner }, (c) =>
       c.query('SELECT status, revoked_at FROM business_members WHERE user_id = $1', [staff]),
@@ -384,7 +386,7 @@ describe('redeem_invite (ADR-0006 §5)', () => {
 
   it('OWNER o‘z biznesining staff taklifini qabul qilsa roli pasaymaydi', async () => {
     expect(await redeem(await invite(), owner)).toEqual([
-      { out_business_id: biz, out_role: 'OWNER' },
+      { out_business_id: biz, out_role: 'OWNER', out_joined: false },
     ]);
   });
 

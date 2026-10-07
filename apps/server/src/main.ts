@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node';
-import { ALLOWED_UPDATES, createBot } from './bot/bot.js';
+import { ALLOWED_UPDATES, createBot, registerFallback } from './bot/bot.js';
 import { loadConfig, redactConfig } from './config/index.js';
 import { createPool } from './db/pool.js';
 import { buildServer } from './http/server.js';
@@ -16,6 +16,7 @@ const pool = createPool(config.db.url, {
 });
 const bot = createBot({ config, logger, pool });
 await bot.init();
+registerFallback(bot);
 const app = buildServer({ config, logger, pool, bot });
 
 await app.listen({ host: config.http.host, port: config.http.port });

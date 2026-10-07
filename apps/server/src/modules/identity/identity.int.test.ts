@@ -161,7 +161,14 @@ describe('Mini App autentifikatsiyasi', () => {
 
   it('yaroqsiz yoki yetishmagan initData → 401/400', async () => {
     expect(
-      (await login(fresh(newTelegramId()).replace(/hash=[0-9a-f]/, 'hash=0'))).statusCode,
+      (
+        await login(
+          fresh(newTelegramId()).replace(
+            /hash=([0-9a-f])/,
+            (_m, c: string) => `hash=${c === '0' ? '1' : '0'}`,
+          ),
+        )
+      ).statusCode,
     ).toBe(401);
     expect((await login(signInitData({ auth_date: '1', user: '{"id":1}' }))).statusCode).toBe(401);
     expect(
