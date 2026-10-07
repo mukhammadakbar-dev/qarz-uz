@@ -1,0 +1,85 @@
+# /etc/nginx/sites-available/nasiya  →  ln -s ... /etc/nginx/sites-enabled/
+# `nasiya.example.uz` ni o'z domeningizga almashtiring. TLS: certbot --nginx -d nasiya.example.uz
+
+limit_req_zone $binary_remote_addr zone=nasiya_api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=nasiya_auth:10m rate=2r/s;
+
+upstream nasiya_app {
+  server 127.0.0.1:3000;
+  keepalive 16;
+}
+
+server {
+  listen 80;
+  server_name nasiya.example.uz;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name nasiya.example.uz;
+
+  # certbot shu qatorlarni o'zi to'ldiradi
+  ssl_certificate     /etc/letsencrypt/live/nasiya.example.uz/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/nasiya.example.uz/privkey.pem;
+
+  add_header Strict-Transport-Security "max-age=31536000" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "no-referrer" always;
+
+  client_max_body_size 1m;
+  server_tokens off;
+
+  # Telegram webhook: faqat Telegram IP diapazonlari (https://core.telegram.org/resources/cidr.txt)
+  # + ilova ichida secret token tekshiriladi. Diapazonlar o'zgarsa yangilang.
+  location = /telegram/webhook {
+    allow 149.154.160.0/20;
+    allow 91.108.4.0/22;
+    deny all;
+    proxy_pass http://nasiya_app;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+  }
+
+  # Mini App uchun avtorizatsiya
+  location = /api/auth/telegram {
+    limit_req zone=nasiya_auth burst=5 nodelay;
+    proxy_pass http://nasiya_app;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location /api/ {
+    limit_req zone=nasiya_api burst=30 nodelay;
+    proxy_pass http://nasiya_app;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # Monitoring uchun (UptimeRobot va h.k.); /readyz tashqariga ochilmaydi
+  location = /healthz {
+    proxy_pass http://nasiya_app;
+  }
+
+  # Mini App statik fayllari (Phase 4 da yoqiladi)
+  # location /app/ {
+  #   alias /srv/nasiya/apps/miniapp/dist/;
+  #   try_files $uri $uri/ /app/index.html;
+  # }
+
+  location / {
+    return 404;
+  }
+}

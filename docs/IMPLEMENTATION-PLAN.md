@@ -6,6 +6,17 @@
 
 ---
 
+## Bajarilish holati
+
+| Bosqich                                                                                            | Holat                                                                                                              |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Phase 0 (ADR, golden dataset)                                                                      | ✅ tayyor                                                                                                          |
+| Phase 1 T1.1–T1.10 (scaffold, config, DB, log, CI, sxema/RLS, webhook, identity, RBAC, onboarding) | ✅ tayyor                                                                                                          |
+| Phase 1 T1.11 (staging)                                                                            | 🟡 kod va hujjat tayyor (build, PM2, nginx, DB bootstrap, `deploy.sh`, `docs/DEPLOY.md`); serverda hali sinalmagan |
+| Phase 2 (Ledger) va keyingilar                                                                     | ⏳                                                                                                                 |
+
+---
+
 ## 0. Qabul qilingan qarorlar (ADR qisqacha)
 
 | #   | Mavzu                   | Qaror                                                                                                                                                                              |
