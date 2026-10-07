@@ -105,6 +105,7 @@ Invariantlar faqat ilovada emas, DB’ning o‘zida majburlanadi (24 ta xom-SQL 
 ### 10. Konkurentlik
 
 - Har bir moliyaviy tranzaksiya `SELECT … FROM customers WHERE id=$1 AND business_id=$2 FOR UPDATE` bilan boshlanadi.
+  - Bu **yagona** qulf nuqtasi. Balans qatorini qulflab bo‘lmaydi (`FOR UPDATE` UPDATE huquqini talab qiladi, ilova roliga esa balansga yozish taqiqlangan), kerak ham emas: qulfdan keyin balans o‘qilganda u o‘zgara olmaydi. Arxivlash ham xuddi shu qatorni qulflaydi.
 - Lock tartibi bitta mijoz bilan cheklanadi, shuning uchun deadlock xavfi yo‘q. Ko‘p mijozli amal MVP'da mavjud emas.
 
 ### 11. Mijoz hayot sikli

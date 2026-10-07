@@ -9,20 +9,20 @@ TT MVP uchun modular monolith tavsiya qiladi (§38). Microservices, Kafka va Kub
 
 ## Qaror
 
-| Soha          | Tanlov                                                                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Til / runtime | TypeScript (`strict`, `noUncheckedIndexedAccess`), Node 22 LTS yoki undan yuqori                                                                             |
-| HTTP          | Fastify (webhook va Mini App API bitta jarayonda)                                                                                                            |
-| Bot           | grammY (webhook rejimi prod'da, long polling faqat dev'da)                                                                                                   |
-| DB            | PostgreSQL 16, `pg_trgm` kengaytmasi                                                                                                                         |
-| DB kirish     | Kysely (typed query builder) + oddiy SQL migratsiyalar. ORM ishlatilmaydi, chunki `FOR UPDATE`, trigger, RLS va generated ustunlar bilan ochiq ishlash kerak |
-| Validatsiya   | zod (env, HTTP, LLM chiqishi)                                                                                                                                |
-| Mini App      | React + Vite + `@telegram-apps/sdk`                                                                                                                          |
-| Monorepo      | pnpm workspaces: `apps/server`, `apps/miniapp`, `packages/shared`, `packages/nlp-eval`                                                                       |
-| Test          | vitest, fast-check (property testlar), **real PostgreSQL** (pg-mem emas: trigger, RLS va lock'lar kerak)                                                     |
-| Lint / format | oxlint + prettier                                                                                                                                            |
-| Log / xato    | pino (redaction bilan) + Sentry                                                                                                                              |
-| Deploy        | VPS + Nginx (TLS) + PM2 (`ecosystem.config.cjs`). Docker **faqat lokal dev** uchun (`scripts/dev-db.sh`, Postgres 16)                                        |
+| Soha          | Tanlov                                                                                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Til / runtime | TypeScript (`strict`, `noUncheckedIndexedAccess`), Node 22 LTS yoki undan yuqori                                                                                                                     |
+| HTTP          | Fastify (webhook va Mini App API bitta jarayonda)                                                                                                                                                    |
+| Bot           | grammY (webhook rejimi prod'da, long polling faqat dev'da)                                                                                                                                           |
+| DB            | PostgreSQL 16, `pg_trgm` kengaytmasi                                                                                                                                                                 |
+| DB kirish     | Hozircha `pg` + parametrli xom SQL (servislar kichik, so‘rovlar `FOR UPDATE`, RLS, trigger va generated ustunlarga bog‘liq). Kysely (typed builder) kerak bo‘lsa keyin qo‘shiladi; ORM ishlatilmaydi |
+| Validatsiya   | zod (env, HTTP, LLM chiqishi)                                                                                                                                                                        |
+| Mini App      | React + Vite + `@telegram-apps/sdk`                                                                                                                                                                  |
+| Monorepo      | pnpm workspaces: `apps/server`, `apps/miniapp`, `packages/shared`, `packages/nlp-eval`                                                                                                               |
+| Test          | vitest, fast-check (property testlar), **real PostgreSQL** (pg-mem emas: trigger, RLS va lock'lar kerak)                                                                                             |
+| Lint / format | oxlint + prettier                                                                                                                                                                                    |
+| Log / xato    | pino (redaction bilan) + Sentry                                                                                                                                                                      |
+| Deploy        | VPS + Nginx (TLS) + PM2 (`ecosystem.config.cjs`). Docker **faqat lokal dev** uchun (`scripts/dev-db.sh`, Postgres 16)                                                                                |
 
 ### Server modullari
 
