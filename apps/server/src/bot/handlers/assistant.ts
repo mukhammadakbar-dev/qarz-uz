@@ -45,11 +45,7 @@ import {
   getEntry,
   getHistory,
 } from '../../modules/ledger/index.js';
-import {
-  withBusiness,
-  resolveBusinessAccess,
-  type BusinessAccess,
-} from '../../modules/tenancy/index.js';
+import { resolveBusinessAccess, type BusinessAccess } from '../../modules/tenancy/index.js';
 import type { Logger } from '../../observability/logger.js';
 import type { BotContext } from '../bot.js';
 import { renderDecision, type Button, type Rendered, type RenderContext } from '../ui/render.js';
