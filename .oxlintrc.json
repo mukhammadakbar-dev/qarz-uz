@@ -5,7 +5,9 @@
   "rules": {
     "no-console": "warn",
     "eqeqeq": ["error", "smart"],
-    "typescript/no-explicit-any": "error"
+    "typescript/no-explicit-any": "error",
+    "oxc/no-async-endpoint-handlers": "off",
+    "unicorn/consistent-function-scoping": "off"
   },
   "ignorePatterns": ["node_modules", "dist", "coverage", "packages/nlp-eval/golden.jsonl"],
   "overrides": [

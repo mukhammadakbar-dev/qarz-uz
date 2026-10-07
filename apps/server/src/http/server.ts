@@ -9,12 +9,13 @@ import { toPublicError } from '../errors/index.js';
 import { runWithContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { reportError } from '../observability/sentry.js';
+import { registerAuthRoutes } from './auth.js';
 
 export const WEBHOOK_PATH = '/telegram/webhook';
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
 export interface ServerDeps {
-  readonly config: Pick<Config, 'telegram'>;
+  readonly config: Pick<Config, 'telegram' | 'session'>;
   readonly logger: Logger;
   readonly pool: Pool;
   readonly bot: Bot<BotContext>;
@@ -83,6 +84,8 @@ export function buildServer(deps: ServerDeps) {
     await bot.handleUpdate(update as Update);
     return reply.status(200).send({ ok: true });
   });
+
+  registerAuthRoutes(app, { config, pool });
 
   return app;
 }

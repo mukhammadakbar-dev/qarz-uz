@@ -2,15 +2,17 @@ import { Bot, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import type { Pool } from 'pg';
 import type { Config } from '../config/index.js';
+import { upsertTelegramUser, type User } from '../modules/identity/index.js';
 import { reportError } from '../observability/sentry.js';
-import { runWithContext } from '../observability/context.js';
+import { runWithContext, setContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { KeyedMutex } from '../util/keyed-mutex.js';
 
 /** Faqat kerakli update turlari (ADR-0006 §1). */
 export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const;
 
-export type BotContext = Context;
+/** `user` identity middleware tomonidan har bir (private) update uchun o'rnatiladi. */
+export type BotContext = Context & { user: User };
 
 export interface BotDeps {
   readonly config: Pick<Config, 'telegram'>;
@@ -29,6 +31,7 @@ const GENERIC_ERROR = 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko�
  *  3. faqat private chat
  *  4. bir chat ichida ketma-ket ishlov (kelish tartibida)
  *  5. update dedupe (processed_updates, best-effort — moliyaviy kafolat emas, ADR-0003)
+ *  6. identity: Telegram `from` bo'yicha foydalanuvchi (ctx.user); botlar e'tiborsiz
  */
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const { logger, pool } = deps;
@@ -79,6 +82,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       logger.info('takroriy update o‘tkazib yuborildi');
       return;
     }
+    await next();
+  });
+
+  bot.use(async (ctx, next) => {
+    const from = ctx.from;
+    if (!from || from.is_bot) return;
+    ctx.user = await upsertTelegramUser(pool, from);
+    setContext({ userId: ctx.user.id });
     await next();
   });
 
