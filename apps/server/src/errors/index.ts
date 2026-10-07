@@ -74,6 +74,14 @@ export class BusinessRequiredError extends DomainError {
     super('BUSINESS_REQUIRED', 409, 'Avval biznesni tanlang', options);
   }
 }
+/** Idempotency kaliti boshqa tanali so'rov uchun ishlatilgan. */
+export class IdempotencyKeyReusedError extends DomainError {
+  constructor() {
+    super('CONFLICT', 422, 'Idempotency kaliti boshqa so‘rov uchun ishlatilgan', {
+      details: { reason: 'IDEMPOTENCY_KEY_REUSED' },
+    });
+  }
+}
 export class RateLimitedError extends DomainError {
   constructor(message = 'So‘rovlar juda ko‘p', options?: DomainErrorOptions) {
     super('RATE_LIMITED', 429, message, options);

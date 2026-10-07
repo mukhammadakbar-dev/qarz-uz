@@ -53,6 +53,18 @@ const envSchema = z
 
     // Mini App sessiyasi (ADR-0006)
     SESSION_SECRET: z.string().min(32, 'kamida 32 belgi'),
+    // Mini App boshqa originda ishlasa (dev: Vite) — vergul bilan; MINIAPP_URL originidan tashqari
+    CORS_ORIGINS: z
+      .string()
+      .default('')
+      .transform((v) =>
+        v
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.url())),
+    API_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).max(1_000_000).default(240),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(60).default(3600),
     INITDATA_MAX_AGE_SECONDS: z.coerce.number().int().min(60).default(86400),
 
@@ -130,6 +142,7 @@ export interface Config {
     readonly publicBaseUrl: string | undefined;
     readonly miniAppUrl: string | undefined;
   };
+  readonly api: { readonly corsOrigins: readonly string[]; readonly rateLimitPerMinute: number };
   readonly session: {
     readonly secret: string;
     readonly ttlSeconds: number;
@@ -199,6 +212,15 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
       mode: e.TELEGRAM_MODE ?? (production ? 'webhook' : 'polling'),
       publicBaseUrl: e.PUBLIC_BASE_URL?.replace(/\/+$/, ''),
       miniAppUrl: e.MINIAPP_URL,
+    }),
+    api: Object.freeze({
+      corsOrigins: Object.freeze([
+        ...new Set([
+          ...(e.MINIAPP_URL ? [new URL(e.MINIAPP_URL).origin] : []),
+          ...e.CORS_ORIGINS.map((o) => new URL(o).origin),
+        ]),
+      ]),
+      rateLimitPerMinute: e.API_RATE_LIMIT_PER_MINUTE,
     }),
     session: Object.freeze({
       secret: e.SESSION_SECRET,

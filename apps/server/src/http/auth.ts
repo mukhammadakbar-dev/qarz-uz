@@ -92,21 +92,26 @@ export function registerAuthRoutes<L extends FastifyBaseLogger>(
 ): void {
   const authenticate = createAuthenticate(deps);
 
-  app.post('/api/auth/telegram', async (request) => {
-    const parsed = loginBody.safeParse(request.body);
-    if (!parsed.success) throw new ValidationError('initData majburiy');
-    const verified = verifyInitData(parsed.data.initData, {
-      botToken: deps.config.telegram.botToken,
-      maxAgeSeconds: deps.config.session.initDataMaxAgeSeconds,
-    });
-    const user = await upsertTelegramUser(deps.pool, verified.user);
-    setContext({ userId: user.id });
-    const { token, expiresAt } = issueSessionToken(user.id, {
-      secret: deps.config.session.secret,
-      ttlSeconds: deps.config.session.ttlSeconds,
-    });
-    return { token, expiresAt, user: publicUser(user) };
-  });
+  // Brute-force/qayta yuborishga qarshi: IP bo'yicha qattiq chegara
+  app.post(
+    '/api/auth/telegram',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request) => {
+      const parsed = loginBody.safeParse(request.body);
+      if (!parsed.success) throw new ValidationError('initData majburiy');
+      const verified = verifyInitData(parsed.data.initData, {
+        botToken: deps.config.telegram.botToken,
+        maxAgeSeconds: deps.config.session.initDataMaxAgeSeconds,
+      });
+      const user = await upsertTelegramUser(deps.pool, verified.user);
+      setContext({ userId: user.id });
+      const { token, expiresAt } = issueSessionToken(user.id, {
+        secret: deps.config.session.secret,
+        ttlSeconds: deps.config.session.ttlSeconds,
+      });
+      return { token, expiresAt, user: publicUser(user) };
+    },
+  );
 
   app.get('/api/me', { preHandler: authenticate }, async (request) => {
     const user = request.user!;

@@ -22,6 +22,7 @@ import {
 } from '../../errors/index.js';
 import { t as translate, type MessageKey } from '../../i18n/index.js';
 import { createAssistantEnv, type AssistantEnv } from '../../modules/assistant/env.js';
+import { notifyOwnerOfDeletion } from '../../modules/assistant/notify.js';
 import { commitDraft } from '../../modules/assistant/commit.js';
 import { createDraft, loadDraft, transitionDraft } from '../../modules/conversation/drafts.js';
 import {
@@ -343,20 +344,6 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
     await ctx.reply(lines.join('\n'), { reply_markup: kb });
   }
 
-  async function ownerOf(
-    access: BusinessAccess,
-  ): Promise<{ telegramId: number; locale: Locale } | null> {
-    const { rows } = await withBusiness(pool, access, (c) =>
-      c.query<{ telegram_user_id: string; locale: Locale }>(
-        `SELECT u.telegram_user_id, u.locale FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`,
-        [access.businessId],
-      ),
-    );
-    return rows[0]
-      ? { telegramId: Number(rows[0].telegram_user_id), locale: rows[0].locale }
-      : null;
-  }
-
   // ───────── Qoralamani tasdiqlash ─────────
 
   async function handleCommit(ctx: BotContext, draftId: string): Promise<void> {
@@ -625,24 +612,16 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
         ctx.t('delete.done', { balance: formatUzs(result.balance, ctx.user.locale) }),
       );
       if (result.notifyOwner) {
-        const owner = await ownerOf(access);
-        if (owner && owner.telegramId !== ctx.user.telegramUserId) {
-          const who = ctx.user.firstName ?? ctx.user.username ?? String(ctx.user.telegramUserId);
-          await ctx.api
-            .sendMessage(
-              owner.telegramId,
-              translate(owner.locale, 'delete.ownerNotice', {
-                user: who,
-                name: displayName({ name: detail.customerName, label: detail.customerLabel }),
-                delta: formatSigned(detail.delta),
-                type: translate(owner.locale, `type.${detail.type}` as MessageKey),
-                balance: formatUzs(result.balance, owner.locale),
-              }),
-            )
-            .catch((error: unknown) =>
-              logger.warn({ err: error }, 'egasiga o‘chirish xabari yuborilmadi'),
-            );
-        }
+        await notifyOwnerOfDeletion(
+          { pool, logger, send: (chatId, text) => ctx.api.sendMessage(chatId, text) },
+          access,
+          {
+            name: ctx.user.firstName ?? ctx.user.username ?? String(ctx.user.telegramUserId),
+            telegramUserId: ctx.user.telegramUserId,
+          },
+          detail,
+          result.balance,
+        );
       }
     } catch (error) {
       await replyDomainError(ctx, error);
