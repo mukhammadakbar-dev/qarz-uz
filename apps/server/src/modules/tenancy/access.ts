@@ -107,3 +107,32 @@ export async function withBusiness<T>(
   setContext({ businessId: access.businessId });
   return withTenant(pool, { businessId: access.businessId, userId: access.userId }, fn);
 }
+
+/**
+ * YOZUVLAR uchun: tranzaksiya ichida a'zolik va rolni DB'dan qayta o'qiydi (eskirgan `access` ga ishonilmaydi),
+ * permission'ni YANGI rol bilan tekshiradi. Revoke qilingan xodim, hatto eski access ushlab turgan bo'lsa ham,
+ * hech narsa yoza olmaydi (TT §46, ADR-0003 qadam 2).
+ */
+export async function withVerifiedBusiness<T>(
+  pool: Pool,
+  access: BusinessAccess,
+  permission: Permission,
+  fn: (client: PoolClient, fresh: BusinessAccess) => Promise<T>,
+): Promise<T> {
+  setContext({ businessId: access.businessId });
+  return withTenant(
+    pool,
+    { businessId: access.businessId, userId: access.userId },
+    async (client) => {
+      const { rows } = await client.query<{ role: Role }>(
+        "SELECT role FROM business_members WHERE business_id = $1 AND user_id = $2 AND status = 'ACTIVE'",
+        [access.businessId, access.userId],
+      );
+      const role = rows[0]?.role;
+      if (!role) throw new ForbiddenError();
+      const fresh: BusinessAccess = { userId: access.userId, businessId: access.businessId, role };
+      requirePermission(fresh, permission);
+      return fn(client, fresh);
+    },
+  );
+}

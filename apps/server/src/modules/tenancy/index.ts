@@ -4,6 +4,7 @@ export {
   resolveBusinessAccess,
   setActiveBusiness,
   withBusiness,
+  withVerifiedBusiness,
   type BusinessAccess,
   type Membership,
 } from './access.js';

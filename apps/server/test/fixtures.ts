@@ -90,3 +90,20 @@ export async function insertCustomer(
   );
   return rows[0]!.id;
 }
+
+/** Xom SQL bilan qarz (LedgerService yozilgunga qadar va servisdan mustaqil tayyorgarlik uchun). */
+export async function insertDebt(
+  pool: Pool,
+  businessId: string,
+  userId: string,
+  customerId: string,
+  amount: number,
+): Promise<void> {
+  await withTenant(pool, { businessId, userId }, (c) =>
+    c.query(
+      `INSERT INTO ledger_entries (business_id, customer_id, type, amount, created_by, source, idempotency_key)
+       VALUES ($1, $2, 'DEBT', $3, $4, 'SYSTEM', $5)`,
+      [businessId, customerId, amount, userId, `fx-${randomUUID()}`],
+    ),
+  );
+}
