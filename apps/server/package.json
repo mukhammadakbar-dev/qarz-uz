@@ -7,6 +7,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@nasiya/shared": "workspace:*"
+    "@nasiya/shared": "workspace:*",
+    "zod": "^4.6.5"
   }
 }
