@@ -74,6 +74,15 @@ OWNER'ni o‘zi o‘chira olmaydi va biznesda kamida bitta ACTIVE OWNER qoladi.
 - `app` roli `BYPASSRLS` huquqiga ega emas. `migrator` va backup rollari alohida.
 - Cross-tenant ishlar (reconciliation, eslatmalar, billing admin) alohida `system` servis roli orqali, aniq belgilangan yo‘llar bilan.
 
+**Amalda qabul qilingan aniqlashtirishlar (T1.6):**
+
+- `FORCE ROW LEVEL SECURITY` ishlatilmaydi. Jadval egasi (`nasiya_migrator`) va `SECURITY DEFINER` funksiyalar RLS dan o‘tadi; migrator ilova ishlayotganda ulanmaydi. `nasiya_app` esa har doim RLS ostida.
+- Kontekst ikki GUC bilan beriladi: `app.business_id` va `app.user_id` (`withTenant` ichida `set_config(..., true)`). `business_members` va `businesses` uchun foydalanuvchi o‘z a’zoliklarini `app.user_id` orqali ko‘ra oladi (biznes tanlash uchun), qolgan jadvallar faqat `app.business_id` bo‘yicha.
+- `users` va `processed_updates` global jadval, RLS yo‘q; faqat `identity` moduli murojaat qiladi.
+- Cross-tenant ishlar uchun alohida **`nasiya_system`** roli (`BYPASSRLS`, alohida pool, `SYSTEM_DATABASE_URL`): cron, reconciliation, superadmin billing. Unga UPDATE faqat `subscriptions` va `users`/`businesses`/`business_members` da, `processed_updates` da DELETE beriladi.
+- Staff taklifini qabul qilish yagona atomik yo‘l: `redeem_invite(token_hash, user_id)` (`SECURITY DEFINER`). Yaroqsiz token hech narsa qaytarmaydi; REVOKED a’zo qayta faollashadi; ACTIVE a’zoning roli pasaytirilmaydi.
+- Yangi jadvallarda `nasiya_app` default holda faqat `SELECT, INSERT` oladi (append-only). `UPDATE/DELETE` har jadval uchun alohida, ataylab beriladi.
+
 **Composite FK:** `(business_id, customer_id)` juftligi `customers(business_id, id)` ga ulanadi, shuning uchun boshqa biznes mijoziga yozuv DB darajasida ham mumkin emas.
 
 ### 7. Rate limiting va suiiste'mol

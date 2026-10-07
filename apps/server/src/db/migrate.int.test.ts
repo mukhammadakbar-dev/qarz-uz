@@ -5,15 +5,19 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TEST_APP_URL, TEST_MIGRATOR_URL } from '../../test/env.js';
-import { runMigrations } from './migrate.js';
+import { loadMigrations, runMigrations } from './migrate.js';
 import { createPool, withTransaction } from './pool.js';
 
 const realDir = fileURLToPath(new URL('../../migrations', import.meta.url));
 let scratch: string;
+let realNames: string[];
+let next: string; // keyingi (hali yo'q) migratsiya raqami
 let migrator: Pool;
 let app: Pool;
 
 beforeAll(async () => {
+  realNames = (await loadMigrations(realDir)).map((m) => m.name);
+  next = String(realNames.length + 1).padStart(4, '0');
   scratch = await mkdtemp(join(tmpdir(), 'nasiya-mig-int-'));
   await cp(realDir, scratch, { recursive: true });
   migrator = createPool(TEST_MIGRATOR_URL, { max: 2 });
@@ -22,17 +26,19 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await migrator.query('DROP TABLE IF EXISTS tmp_priv, tmp_fail');
-  await migrator.query("DELETE FROM schema_migrations WHERE name > '0001_init.sql'");
+  await migrator.query(
+    "DELETE FROM schema_migrations WHERE name LIKE '%\\_tmp\\_%' OR name LIKE '%\\_ghost%'",
+  );
   await Promise.all([migrator.end(), app.end()]);
   await rm(scratch, { recursive: true, force: true });
 });
 
 describe('runMigrations (real Postgres)', () => {
-  it('global setup 0001 ni qo‘llagan, qayta ishga tushirish hech narsa qilmaydi', async () => {
+  it('global setup hamma migratsiyalarni qo‘llagan, qayta ishga tushirish hech narsa qilmaydi', async () => {
     const applied = await runMigrations({ connectionString: TEST_MIGRATOR_URL, dir: realDir });
     expect(applied).toEqual([]);
-    const { rows } = await migrator.query('SELECT name FROM schema_migrations');
-    expect(rows).toEqual([{ name: '0001_init.sql' }]);
+    const { rows } = await migrator.query('SELECT name FROM schema_migrations ORDER BY name');
+    expect(rows.map((r) => r.name)).toEqual(realNames);
   });
 
   it('pg_trgm kengaytmasi va set_updated_at funksiyasi mavjud', async () => {
@@ -53,33 +59,38 @@ describe('runMigrations (real Postgres)', () => {
 
   it('xato migratsiya to‘liq ROLLBACK bo‘ladi', async () => {
     await writeFile(
-      join(scratch, '0002_tmp_fail.sql'),
+      join(scratch, `${next}_tmp_fail.sql`),
       'CREATE TABLE tmp_fail (id int); SELECT 1/0;',
     );
     await expect(
       runMigrations({ connectionString: TEST_MIGRATOR_URL, dir: scratch }),
-    ).rejects.toThrow(/0002_tmp_fail/);
+    ).rejects.toThrow(/_tmp_fail/);
     const t = await migrator.query("SELECT to_regclass('public.tmp_fail') AS t");
     expect(t.rows[0].t).toBeNull();
-    const m = await migrator.query("SELECT 1 FROM schema_migrations WHERE name LIKE '0002%'");
+    const m = await migrator.query(
+      "SELECT 1 FROM schema_migrations WHERE name LIKE '%\\_tmp\\_fail%'",
+    );
     expect(m.rowCount).toBe(0);
-    await rm(join(scratch, '0002_tmp_fail.sql'));
+    await rm(join(scratch, `${next}_tmp_fail.sql`));
   });
 
   it('fayli yo‘qolgan qo‘llangan migratsiyani aniqlaydi', async () => {
     await migrator.query(
-      "INSERT INTO schema_migrations (name, checksum) VALUES ('0002_ghost.sql', 'x')",
+      `INSERT INTO schema_migrations (name, checksum) VALUES ('${next}_ghost.sql', 'x')`,
     );
     await expect(
       runMigrations({ connectionString: TEST_MIGRATOR_URL, dir: realDir }),
     ).rejects.toThrow(/topilmadi/);
-    await migrator.query("DELETE FROM schema_migrations WHERE name = '0002_ghost.sql'");
+    await migrator.query(`DELETE FROM schema_migrations WHERE name = '${next}_ghost.sql'`);
   });
 });
 
 describe('huquqlar siyosati (append-only default)', () => {
   it('yangi jadvalda app roli faqat SELECT/INSERT oladi', async () => {
-    await writeFile(join(scratch, '0002_tmp_priv.sql'), 'CREATE TABLE tmp_priv (id int, v text);');
+    await writeFile(
+      join(scratch, `${next}_tmp_priv.sql`),
+      'CREATE TABLE tmp_priv (id int, v text);',
+    );
     await runMigrations({ connectionString: TEST_MIGRATOR_URL, dir: scratch });
 
     await app.query("INSERT INTO tmp_priv (id, v) VALUES (1, 'a')");

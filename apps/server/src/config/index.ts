@@ -36,6 +36,8 @@ const envSchema = z
       .min(1)
       .regex(/^postgres(ql)?:\/\//, 'postgres:// URL bo‘lishi kerak'),
     MIGRATOR_DATABASE_URL: optionalString,
+    // `nasiya_system` (BYPASSRLS): faqat cron va superadmin billing uchun, alohida pool.
+    SYSTEM_DATABASE_URL: optionalString,
 
     // Telegram
     TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]{20,}$/, 'bot token formati noto‘g‘ri'),
@@ -105,7 +107,11 @@ export interface Config {
   readonly isProduction: boolean;
   readonly http: { readonly host: string; readonly port: number };
   readonly logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
-  readonly db: { readonly url: string; readonly migratorUrl: string | undefined };
+  readonly db: {
+    readonly url: string;
+    readonly migratorUrl: string | undefined;
+    readonly systemUrl: string | undefined;
+  };
   readonly telegram: {
     readonly botToken: string;
     readonly webhookSecret: string;
@@ -155,7 +161,11 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
     isProduction: production,
     http: Object.freeze({ host: e.HOST, port: e.PORT }),
     logLevel: e.LOG_LEVEL,
-    db: Object.freeze({ url: e.DATABASE_URL, migratorUrl: e.MIGRATOR_DATABASE_URL }),
+    db: Object.freeze({
+      url: e.DATABASE_URL,
+      migratorUrl: e.MIGRATOR_DATABASE_URL,
+      systemUrl: e.SYSTEM_DATABASE_URL,
+    }),
     telegram: Object.freeze({
       botToken: e.TELEGRAM_BOT_TOKEN,
       webhookSecret: e.TELEGRAM_WEBHOOK_SECRET,
@@ -187,7 +197,11 @@ export function redactConfig(config: Config): Record<string, unknown> {
     env: config.env,
     http: config.http,
     logLevel: config.logLevel,
-    db: { url: mask(config.db.url), migratorUrl: mask(config.db.migratorUrl) },
+    db: {
+      url: mask(config.db.url),
+      migratorUrl: mask(config.db.migratorUrl),
+      systemUrl: mask(config.db.systemUrl),
+    },
     telegram: {
       botToken: mask(config.telegram.botToken),
       webhookSecret: mask(config.telegram.webhookSecret),
