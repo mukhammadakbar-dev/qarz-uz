@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import type { Bot } from 'grammy';
 import type { Update } from 'grammy/types';
@@ -23,6 +24,8 @@ export interface ServerDeps {
   readonly logger: Logger;
   readonly pool: Pool;
   readonly bot: Bot<BotContext>;
+  /** Mini App build papkasi (apps/miniapp/dist). Berilsa `/app/` ostida xizmat qilinadi. */
+  readonly miniAppDir?: string | undefined;
 }
 
 /** Doimiy vaqtli taqqoslash: uzunlik farqi ham ma'lumot bermasligi uchun avval hash qilinadi. */
@@ -152,6 +155,25 @@ export function buildServer(deps: ServerDeps) {
       await bot.handleUpdate(update as Update);
       return reply.status(200).send({ ok: true });
     });
+
+    if (deps.miniAppDir) {
+      // Hash'langan aktivlar (assets/*) uzoq keshlanadi, index.html esa har safar tekshiriladi
+      routes.get('/app', { config: { rateLimit: false } }, (_request, reply) =>
+        reply.redirect('/app/', 301),
+      );
+      void routes.register(fastifyStatic, {
+        root: deps.miniAppDir,
+        prefix: '/app/',
+        redirect: true,
+        index: ['index.html'],
+        setHeaders: (res, filePath) => {
+          res.header(
+            'cache-control',
+            filePath.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable',
+          );
+        },
+      });
+    }
 
     registerAuthRoutes(routes, { config, pool });
     registerApi(routes, {

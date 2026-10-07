@@ -1,3 +1,4 @@
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -7,7 +8,17 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['apps/**/*.test.ts', 'packages/**/*.test.{ts,mjs}'],
-          exclude: ['**/node_modules/**', '**/dist/**', '**/*.int.test.ts'],
+          exclude: ['**/node_modules/**', '**/dist/**', '**/*.int.test.ts', 'apps/miniapp/**'],
+        },
+      },
+      {
+        // Mini App komponent testlari: jsdom + Testing Library
+        plugins: [react()],
+        test: {
+          name: 'miniapp',
+          environment: 'jsdom',
+          include: ['apps/miniapp/**/*.test.{ts,tsx}'],
+          setupFiles: ['apps/miniapp/test/setup.ts'],
         },
       },
       {

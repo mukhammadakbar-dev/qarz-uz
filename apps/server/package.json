@@ -12,7 +12,8 @@
     "webhook:info": "node --env-file-if-exists=../../.env --import tsx src/bot/webhook-cli.ts info",
     "build": "tsup",
     "start": "node dist/main.js",
-    "migrate:prod": "node dist/migrate.js"
+    "migrate:prod": "node dist/migrate.js",
+    "dev:initdata": "node --env-file-if-exists=../../.env --import tsx src/dev/init-data.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

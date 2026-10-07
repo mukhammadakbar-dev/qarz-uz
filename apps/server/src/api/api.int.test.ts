@@ -558,3 +558,39 @@ describe('tezlik cheklovi', () => {
     }
   });
 });
+
+describe('Mini App statik fayllari (/app/)', () => {
+  it('index.html keshlanmaydi, hash’langan aktivlar uzoq keshlanadi, CSP sarlavhasi bor', async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'miniapp-'));
+    await mkdir(join(dir, 'assets'));
+    await writeFile(join(dir, 'index.html'), '<!doctype html><title>Temir Daftar</title>');
+    await writeFile(join(dir, 'assets', 'app-abc123.js'), 'console.log(1)');
+    const hh = await createApiHarness({}, { miniAppDir: dir });
+    try {
+      const index = await hh.app.inject({ method: 'GET', url: '/app/' });
+      expect(index.statusCode).toBe(200);
+      expect(index.body).toContain('Temir Daftar');
+      expect(index.headers['cache-control']).toBe('no-cache');
+      expect(String(index.headers['content-security-policy'])).toContain("script-src 'self'");
+
+      const asset = await hh.app.inject({ method: 'GET', url: '/app/assets/app-abc123.js' });
+      expect(asset.statusCode).toBe(200);
+      expect(asset.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+
+      expect((await hh.app.inject({ method: 'GET', url: '/app' })).statusCode).toBe(301);
+      // Yo'l tashqarisiga chiqib bo'lmaydi
+      expect(
+        (await hh.app.inject({ method: 'GET', url: '/app/../../etc/passwd' })).statusCode,
+      ).not.toBe(200);
+      expect(
+        (await hh.app.inject({ method: 'GET', url: '/app/%2e%2e/%2e%2e/etc/passwd' })).statusCode,
+      ).not.toBe(200);
+    } finally {
+      await hh.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

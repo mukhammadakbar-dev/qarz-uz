@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "oxlint",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "vitest run --project unit",
+    "test": "vitest run --project unit --project miniapp",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test",
@@ -17,10 +17,13 @@
     "golden:validate": "node packages/nlp-eval/validate-golden.mjs",
     "test:int": "vitest run --project int",
     "db:up": "scripts/dev-db.sh up",
-    "migrate": "pnpm --filter @nasiya/server migrate"
+    "migrate": "pnpm --filter @nasiya/server migrate",
+    "dev:miniapp": "pnpm --filter @nasiya/miniapp dev",
+    "build:miniapp": "pnpm --filter @nasiya/miniapp build"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@vitejs/plugin-react": "^6.1.2",
     "fast-check": "^4.10.2",
     "oxlint": "^1.87.0",
     "prettier": "^3.9.9",

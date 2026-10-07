@@ -49,7 +49,10 @@ export interface Shop {
   customer(name: string, debt?: number): Promise<string>;
 }
 
-export async function createApiHarness(env: Record<string, string> = {}): Promise<ApiHarness> {
+export async function createApiHarness(
+  env: Record<string, string> = {},
+  options: { miniAppDir?: string } = {},
+): Promise<ApiHarness> {
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'fatal',
@@ -88,7 +91,7 @@ export async function createApiHarness(env: Record<string, string> = {}): Promis
       result: { message_id: 1, date: 1, chat: { id: 1, type: 'private' } },
     } as never;
   });
-  const app = buildServer({ config, logger, pool, bot });
+  const app = buildServer({ config, logger, pool, bot, miniAppDir: options.miniAppDir });
   await app.ready();
 
   const tokenFor = (userId: string) =>
@@ -100,17 +103,17 @@ export async function createApiHarness(env: Record<string, string> = {}): Promis
     sys,
     sentMessages,
     tokenFor,
-    async call(method, url, options = {}) {
-      const headers: Record<string, string> = { ...options.headers };
-      if (options.token) headers['authorization'] = `Bearer ${options.token}`;
-      if (options.businessId) headers['x-business-id'] = options.businessId;
-      if (options.key)
-        headers['idempotency-key'] = options.key === true ? randomUUID() : options.key;
+    async call(method, url, callOptions = {}) {
+      const headers: Record<string, string> = { ...callOptions.headers };
+      if (callOptions.token) headers['authorization'] = `Bearer ${callOptions.token}`;
+      if (callOptions.businessId) headers['x-business-id'] = callOptions.businessId;
+      if (callOptions.key)
+        headers['idempotency-key'] = callOptions.key === true ? randomUUID() : callOptions.key;
       const res = await app.inject({
         method: method as 'GET',
         url,
         headers,
-        ...(options.body !== undefined ? { payload: options.body as object } : {}),
+        ...(callOptions.body !== undefined ? { payload: callOptions.body as object } : {}),
       });
       let body: any = null;
       try {
@@ -120,7 +123,7 @@ export async function createApiHarness(env: Record<string, string> = {}): Promis
       }
       return { status: res.statusCode, body, headers: res.headers };
     },
-    async shop(options = {}) {
+    async shop(shopOptions = {}) {
       const tg = async () => {
         const id = await fx.createUser(pool, 'u');
         const { rows } = await sys.query('SELECT telegram_user_id FROM users WHERE id = $1', [id]);
@@ -129,7 +132,7 @@ export async function createApiHarness(env: Record<string, string> = {}): Promis
       const owner = await tg();
       const staff = await tg();
       const businessId = await fx.createBusiness(pool, owner.id, 'Test do‘kon');
-      if (options.staff !== false) await fx.addMember(pool, businessId, owner.id, staff.id);
+      if (shopOptions.staff !== false) await fx.addMember(pool, businessId, owner.id, staff.id);
       const ownerAccess = await resolveBusinessAccess(pool, {
         id: owner.id,
         activeBusinessId: businessId,

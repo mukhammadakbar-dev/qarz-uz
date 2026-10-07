@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import * as Sentry from '@sentry/node';
 import { ALLOWED_UPDATES, createBot, registerFallback } from './bot/bot.js';
 import { loadConfig, redactConfig } from './config/index.js';
@@ -40,7 +42,15 @@ logger.info(
 );
 await bot.init();
 registerFallback(bot);
-const app = buildServer({ config, logger, pool, bot });
+// Mini App build'i: dev (src/) va production (dist/) joylashuvidan topiladi
+const miniAppDir = ['../../miniapp/dist', '../../../miniapp/dist']
+  .map((p) => fileURLToPath(new URL(p, import.meta.url)))
+  .find((p) => existsSync(p));
+if (!miniAppDir)
+  logger.warn(
+    'Mini App build topilmadi (apps/miniapp/dist): /app/ o‘chirilgan. `pnpm build:miniapp`',
+  );
+const app = buildServer({ config, logger, pool, bot, miniAppDir });
 
 await app.listen({ host: config.http.host, port: config.http.port });
 

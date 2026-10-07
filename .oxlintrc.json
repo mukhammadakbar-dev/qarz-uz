@@ -10,7 +10,8 @@
     "eqeqeq": ["error", "smart"],
     "typescript/no-explicit-any": "error",
     "oxc/no-async-endpoint-handlers": "off",
-    "unicorn/consistent-function-scoping": "off"
+    "unicorn/consistent-function-scoping": "off",
+    "import/no-unassigned-import": "off"
   },
   "ignorePatterns": ["node_modules", "dist", "coverage", "packages/nlp-eval/golden.jsonl"],
   "overrides": [
