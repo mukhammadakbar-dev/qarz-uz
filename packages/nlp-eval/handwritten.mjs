@@ -30,6 +30,7 @@ const T = (customers, turns, tags = [], extra = {}) => ({ tags, context: { custo
 export const handwritten = [
   // ───────── TT §46 kritik holatlar ─────────
   S('Murod 50 ming', debt('murod', 50000), ['tt46', 'latin', 'debt']),
+  S('Murod 50 min', debt('murod', 50000), ['tt46', 'latin', 'debt']),
   S('Мурод 50 минг', debt('murod', 50000), ['tt46', 'cyrillic', 'debt']),
   S('Murod 50 минг', debt('murod', 50000), ['tt46', 'mixed', 'debt']),
   S('Мурод 50 ming', debt('murod', 50000), ['tt46', 'mixed', 'debt']),

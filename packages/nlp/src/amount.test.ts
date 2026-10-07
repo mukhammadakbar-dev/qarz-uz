@@ -73,6 +73,19 @@ describe('extractAmounts: raqamli shakllar (TT §20)', () => {
   });
 });
 
+describe('extractAmounts: "ming" imlo xatolari', () => {
+  it('min, mng, mig, mingg...', () => {
+    for (const unit of ['min', 'mng', 'mig', 'mingg', 'minng', 'mimg', 'мин']) {
+      expect(one(`Murod 50 ${unit}`), unit).toBe(50000);
+      expect(one(`Murod 50${unit} berdi`), unit).toBe(50000);
+    }
+  });
+  it('xato shakl harfga yopishgan so‘zning boshi bo‘lsa birlik emas', () => {
+    expect(values('Murod 50 minut')).toEqual([50]);
+    expect(values('Murod 50 migraine')).toEqual([50]);
+  });
+});
+
 describe('extractAmounts: so‘z bilan yozilgan sonlar', () => {
   it('asosiy shakllar', () => {
     expect(one('yuz ming')).toBe(100000);

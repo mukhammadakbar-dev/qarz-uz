@@ -23,6 +23,14 @@ export interface AmountCandidate {
 const UNIT_VALUES: Readonly<Record<string, number>> = {
   k: 1e3,
   ming: 1e3,
+  // "ming" ning keng tarqalgan imlo xatolari (qo'lda terishda): 50 min, 50 mng, 50 mig, 50 mingg...
+  min: 1e3,
+  mng: 1e3,
+  mig: 1e3,
+  mingg: 1e3,
+  minng: 1e3,
+  mimg: 1e3,
+  mign: 1e3,
   mln: 1e6,
   million: 1e6,
   milyon: 1e6,
@@ -31,7 +39,8 @@ const UNIT_VALUES: Readonly<Record<string, number>> = {
   milyard: 1e9,
 };
 
-const UNIT_RE = /^(milliard|milyard|million|milyon|mlrd|mln|ming|k)(?![\p{L}])/u;
+const UNIT_RE =
+  /^(milliard|milyard|million|milyon|mlrd|mln|mingg|minng|ming|mimg|mign|mng|mig|min|k)(?![\p{L}])/u;
 const CURRENCY_WORDS = new Set(['som', 'sum', "so'm", 'soum']);
 
 const isDigit = (ch: string | undefined): boolean => ch !== undefined && ch >= '0' && ch <= '9';
