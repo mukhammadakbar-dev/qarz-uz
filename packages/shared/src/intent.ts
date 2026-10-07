@@ -46,8 +46,13 @@ export const DRAFT_ACTIONS: ReadonlySet<Action> = new Set<Action>([
 
 export interface StructuredIntent {
   intent: Intent;
-  /** Normalizatsiyalangan ism (qo'shimchasiz) yoki null. */
+  /** Normalizatsiyalangan ism (egalik/kelishik qo'shimchasiz) yoki null. */
   customer: string | null;
+  /**
+   * Qo'shimcha kesilmagan shakl ("Olga" → customer "ol", alt "olga"). Qo'shimchani noto'g'ri kesish
+   * ehtimoli bor ismlar uchun resolver ikkinchi urinish sifatida ishlatadi.
+   */
+  customerAlt?: string | null;
   /** Faqat ABSOLUTE da, butun so'm. */
   amount: number | null;
   amountKind: AmountKind;

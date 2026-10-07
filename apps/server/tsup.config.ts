@@ -15,5 +15,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   splitting: false,
-  noExternal: ['@nasiya/shared'],
+  noExternal: ['@nasiya/shared', '@nasiya/nlp'],
 });

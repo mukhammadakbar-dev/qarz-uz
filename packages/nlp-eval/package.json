@@ -5,9 +5,14 @@
   "type": "module",
   "scripts": {
     "build": "node build-golden.mjs",
-    "validate": "node validate-golden.mjs"
+    "validate": "node validate-golden.mjs",
+    "eval": "node --import tsx eval.mjs"
   },
   "dependencies": {
-    "@nasiya/shared": "workspace:*"
+    "@nasiya/shared": "workspace:*",
+    "@nasiya/nlp": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }

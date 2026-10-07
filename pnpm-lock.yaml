@@ -29,6 +29,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@nasiya/nlp':
+        specifier: workspace:*
+        version: link:../../packages/nlp
       '@nasiya/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -64,11 +67,24 @@ importers:
         specifier: ^4.23.15
         version: 4.23.15
 
-  packages/nlp-eval:
+  packages/nlp:
     dependencies:
       '@nasiya/shared':
         specifier: workspace:*
         version: link:../shared
+
+  packages/nlp-eval:
+    dependencies:
+      '@nasiya/nlp':
+        specifier: workspace:*
+        version: link:../nlp
+      '@nasiya/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
 
   packages/shared: {}
 
