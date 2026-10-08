@@ -1,6 +1,6 @@
 import { AMOUNT_KINDS, INTENTS } from '@nasiya/shared';
 import type { LlmIntent } from '@nasiya/nlp';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type ThinkingLevel } from '@google/genai';
 import { z } from 'zod';
 import { CircuitBreaker } from '../../util/resilience.js';
 
@@ -184,7 +184,14 @@ export function createGeminiProvider(options: GeminiOptions): AIProvider {
 }
 
 /** Haqiqiy Gemini chaqiruvi (@google/genai). Kalit faqat shu yerda ishlatiladi va hech qachon loglanmaydi. */
-export function createGeminiGenerate(apiKey: string, model: string): GenerateFn {
+/** "O'ylash" darajasi: yuqorisi sekinroq. Intent ajratish uchun MINIMAL yetarli (modelga qarab LOW). */
+export type GeminiThinkingLevel = 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
+
+export function createGeminiGenerate(
+  apiKey: string,
+  model: string,
+  thinkingLevel: GeminiThinkingLevel = 'MINIMAL',
+): GenerateFn {
   const ai = new GoogleGenAI({ apiKey });
   return async ({ system, user, schema, signal }) => {
     const response = await ai.models.generateContent({
@@ -195,7 +202,9 @@ export function createGeminiGenerate(apiKey: string, model: string): GenerateFn 
         responseMimeType: 'application/json',
         responseJsonSchema: schema,
         temperature: 0,
-        maxOutputTokens: 300,
+        // O'ylash tokenlari ham shu limitga kiradi: kichik limit JSON'ni kesib qo'yadi
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingLevel: thinkingLevel as ThinkingLevel },
         abortSignal: signal,
       },
     });

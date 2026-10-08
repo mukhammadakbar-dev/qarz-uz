@@ -7,6 +7,7 @@
 // yo'li) bo'yicha solishtiradi. Muvaffaqiyat mezoni: birlashtirilgan natijada WFT = 0.
 // Eslatma: bu skript tashqi API ga so'rov yuboradi (golden matnlar, PII yo'q).
 import { mergeIntents, parseRules, redactPii } from '@nasiya/nlp';
+import { normalizeName } from '@nasiya/shared';
 import {
   createGeminiGenerate,
   createGeminiProvider,
@@ -21,13 +22,15 @@ if (!apiKey || !model) {
 }
 
 const provider = createGeminiProvider({
-  generate: createGeminiGenerate(apiKey, model),
+  generate: createGeminiGenerate(apiKey, model, process.env.GEMINI_THINKING_LEVEL ?? 'MINIMAL'),
   model,
   timeoutMs: 15000,
   retries: 1,
 });
 const cases = loadGolden().filter((c) => typeof c.input === 'string' && !c.context);
 const limit = Number(process.env.EVAL_LIMIT ?? cases.length);
+// Bepul tarifda daqiqalik limit kichik: so'rovlar orasida pauza (ms)
+const pauseMs = Number(process.env.EVAL_PAUSE_MS ?? 0);
 const concurrency = Number(process.env.EVAL_CONCURRENCY ?? 4);
 
 const rows = [];
@@ -37,13 +40,15 @@ async function worker() {
     const c = cases[next++];
     const call = await provider.interpret(redactPii(c.input));
     rows.push({ c, call });
+    if (pauseMs) await new Promise((r) => setTimeout(r, pauseMs));
   }
 }
 await Promise.all(Array.from({ length: concurrency }, worker));
 
 const toGot = (r) => ({
   intent: r.intent,
-  customer: r.customer ? r.customer.toLowerCase() : null,
+  // LLM ismni Kirillda qaytarishi mumkin: production resolver kabi normalizatsiyadan keyin solishtiriladi
+  customer: r.customer ? normalizeName(r.customer) : null,
   amount: r.amount,
   amountKind: r.amountKind,
   fraction: r.fraction,
@@ -70,7 +75,22 @@ for (const { c, call } of rows) {
     return { fields, wrong };
   };
   evalOne('rules', rule);
-  if (call.intent) evalOne('llm', toGot(call.intent));
+  if (call.intent) {
+    const raw = evalOne('llm', toGot(call.intent));
+    // EVAL_SHOW_LLM=1: xom LLM xatolarini ko'rsatish (qaysi maydon noto'g'ri — tizimli xatoni topish uchun)
+    if (process.env.EVAL_SHOW_LLM && raw.wrong)
+      console.log(
+        '△ LLM',
+        c.id,
+        JSON.stringify(c.input),
+        '\n   kutilgan:',
+        JSON.stringify(c.expect),
+        '\n   LLM:',
+        JSON.stringify(toGot(call.intent)),
+        '\n   maydonlar:',
+        JSON.stringify(raw.fields),
+      );
+  }
   const m = evalOne('merged', merged.parsed);
   if (m.wrong)
     failures.push({

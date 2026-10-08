@@ -40,7 +40,7 @@ const bot = createBot({
   ai: gemini
     ? {
         provider: createGeminiProvider({
-          generate: createGeminiGenerate(gemini.apiKey, gemini.model),
+          generate: createGeminiGenerate(gemini.apiKey, gemini.model, gemini.thinkingLevel),
           model: gemini.model,
           timeoutMs: gemini.timeoutMs,
         }),

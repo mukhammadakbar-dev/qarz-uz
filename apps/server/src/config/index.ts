@@ -88,6 +88,8 @@ const envSchema = z
     GEMINI_DAILY_LIMIT: z.coerce.number().int().min(0).max(100000).default(300),
     // always: har bir erkin matn (ADR-0004); fallback: faqat rule parser aniq natija bermaganda
     GEMINI_MODE: z.enum(['always', 'fallback']).default('always'),
+    // "O'ylash" darajasi (Gemini 3.x): MINIMAL eng tez; ba'zi modellar faqat LOW dan boshlaydi
+    GEMINI_THINKING_LEVEL: z.enum(['MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).default('MINIMAL'),
 
     SENTRY_DSN: optionalString.pipe(z.url().optional()),
   })
@@ -162,6 +164,7 @@ export interface Config {
           readonly timeoutMs: number;
           readonly dailyLimit: number;
           readonly mode: 'always' | 'fallback';
+          readonly thinkingLevel: 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
         }
       | undefined;
   };
@@ -193,6 +196,7 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
           timeoutMs: e.GEMINI_TIMEOUT_MS,
           dailyLimit: e.GEMINI_DAILY_LIMIT,
           mode: e.GEMINI_MODE,
+          thinkingLevel: e.GEMINI_THINKING_LEVEL,
         }
       : undefined;
 

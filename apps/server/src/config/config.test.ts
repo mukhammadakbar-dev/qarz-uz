@@ -89,6 +89,7 @@ describe('loadConfig', () => {
       timeoutMs: 3000,
       dailyLimit: 300,
       mode: 'always',
+      thinkingLevel: 'MINIMAL',
     });
   });
 
