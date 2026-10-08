@@ -1,5 +1,35 @@
 # Deploy (VPS + PM2 + Nginx)
 
+## Hozirgi production: `kissa.takallam.uz` (2026-10-08)
+
+Server (Contabo VPS, `75.119.158.99`, Ubuntu 24.04) **takallam.uz** loyihasi bilan bo‘lishiladi. Takallam to‘liq Docker'da ishlaydi va 80/443 portlarni uning Caddy konteyneri (`takallam-web-1`) egallaydi. Shuning uchun Kissa uchun Nginx/certbot **ishlatilmaydi**:
+
+| Narsa               | Joyi                                                                                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux foydalanuvchi | `kissa` (root emas; takallam'dan alohida)                                                                                                                                                                                  |
+| Kod                 | `/srv/kissa` (GitHub deploy key: `~kissa/.ssh/github_deploy`, faqat o‘qish)                                                                                                                                                |
+| Sozlamalar          | `/etc/nasiya/server.env` (`kissa:kissa 600`; parollar serverda `openssl` bilan yaratilgan)                                                                                                                                 |
+| Ilova               | PM2 (`nasiya`), `HOST=0.0.0.0`, `PORT=3100`; systemd: `pm2-kissa.service`                                                                                                                                                  |
+| Faervol             | 3100 faqat `172.16.0.0/12` (Docker tarmoqlari) dan; internetdan yopiq                                                                                                                                                      |
+| HTTPS               | takallam repo'sidagi `deploy/Caddyfile` → `kissa.takallam.uz { reverse_proxy host.docker.internal:3100 }`, compose'da `web` ga `extra_hosts: host-gateway`. Sertifikatni Caddy o‘zi oladi                                  |
+| Baza                | Xostdagi PostgreSQL 16 (faqat `127.0.0.1`); takallam'niki konteynerda, kesishmaydi                                                                                                                                         |
+| Loglar              | `/var/log/nasiya/*.log`, `pm2-logrotate` (20 MB, 14 ta)                                                                                                                                                                    |
+| Zaxira              | `deploy/backup.sh` → `/usr/local/bin/kissa-backup.sh`, cron `deploy/backup.cron` → `/etc/cron.d/kissa-backup` (har kuni 03:30 Toshkent), `/var/backups/kissa`, 14 kun. Har nusxa vaqtinchalik bazaga tiklanib tekshiriladi |
+
+Keyingi deploy:
+
+```bash
+ssh root@75.119.158.99 'sudo -iu kissa bash -c "APP_DIR=/srv/kissa /srv/kissa/deploy/deploy.sh"'
+```
+
+Tiklash (favqulodda): `pm2 stop nasiya` → `sudo -u postgres dropdb nasiya && sudo -u postgres createdb -O nasiya_migrator nasiya` → `sudo -u postgres pg_restore -d nasiya < /var/backups/kissa/<fayl>.dump` → `pm2 start nasiya`.
+
+**Hali yo‘q:** zaxira nusxalar shu serverning o‘zida turadi — server yo‘qolsa nusxa ham yo‘qoladi. Real foydalanuvchilar ko‘paygach nusxani boshqa joyga (masalan, shifrlangan holda S3-mos saqlash) ko‘chirish kerak (T6.5).
+
+---
+
+Quyidagi bo‘limlar — alohida (bo‘sh) server uchun umumiy yo‘riqnoma.
+
 Qarorlar: ADR-0001. Docker productionda ishlatilmaydi. Quyidagi qadamlar Ubuntu 22.04/24.04 uchun.
 **Eslatma:** deploy skripti va bootstrap SQL lokal sinovdan o‘tgan (bootstrap + migratsiya + 103 ta integratsion test toza DB ga qarshi), lekin `deploy.sh` va nginx konfiguratsiyasi haqiqiy serverda hali sinalmagan.
 

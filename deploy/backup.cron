@@ -1,0 +1,3 @@
+# Kissa bazasi: har kuni 03:30 (Toshkent) zaxira + tiklash tekshiruvi
+CRON_TZ=Asia/Tashkent
+30 3 * * * root /usr/local/bin/kissa-backup.sh >> /var/log/kissa-backup.log 2>&1
