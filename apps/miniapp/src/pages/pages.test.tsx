@@ -2,137 +2,170 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../lib/api';
-import { customer, entry, fakeApi, renderApp } from '../../test/helpers';
+import { dayLabel } from '../lib/format';
+import { translate } from '../lib/i18n';
+import { customer, entry, fakeApi, renderApp, type FakeApi } from '../../test/helpers';
+import { Business } from './Business';
 import { CustomerDetail } from './CustomerDetail';
 import { CustomerNew } from './CustomerNew';
-import { Customers } from './Customers';
-import { Dashboard } from './Dashboard';
-import { Settings } from './Settings';
-import { Staff } from './Staff';
+import { Home } from './Home';
+import { PickCustomer } from './PickCustomer';
 
+const KEY = /^[0-9a-f-]{36}$/;
 const page = (items: ReturnType<typeof customer>[], nextCursor: string | null = null) => ({
   items,
   nextCursor,
 });
+const dashboard = (over: Record<string, unknown> = {}) => ({
+  business: { id: 'biz-1', name: 'Baraka do‘koni' },
+  role: 'OWNER',
+  summary: { totalDebt: 12480000, debtorsCount: 23, todayOperations: 4 },
+  subscription: { state: 'TRIAL', until: '2026-10-22T10:00:00Z', daysLeft: 9 },
+  ...over,
+});
 
-describe('Dashboard', () => {
-  it('jami qarz, qarzdorlar, bugungi operatsiyalar va eng katta qarzlar', async () => {
+describe('Home (Daftar)', () => {
+  const setup = (role: 'OWNER' | 'STAFF' = 'OWNER') => {
     const api = fakeApi();
-    api.dashboard.mockResolvedValue({
-      business: { id: 'biz-1', name: 'Baraka' },
-      role: 'OWNER',
-      summary: { totalDebt: 1250000, debtorsCount: 12, todayOperations: 8 },
-      subscription: { state: 'ACTIVE', until: '2026-12-01T00:00:00Z', daysLeft: 50 },
-    });
+    api.dashboard.mockResolvedValue(dashboard());
     api.customers.mockResolvedValue(
       page([
-        customer({ id: 'a', name: 'Murodbek', balance: 450000 }),
-        customer({ id: 'b', name: 'Ali', balance: 250000 }),
+        customer({
+          id: 'a',
+          name: 'Olga Petrovna',
+          balance: 2400000,
+          lastActivityAt: '2020-01-01T00:00:00Z',
+        }),
+        customer({
+          id: 'b',
+          name: 'Murod',
+          label: 'aka',
+          balance: 850000,
+          lastActivityAt: new Date().toISOString(),
+        }),
       ]),
     );
-    renderApp(<Dashboard />, { api });
-    expect(await screen.findByTestId('total-debt')).toHaveTextContent('1 250 000 so‘m');
-    expect(screen.getByText('12 ta')).toBeInTheDocument();
-    expect(screen.getByText('8 ta')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: /Murodbek/ })).toHaveAttribute(
-      'href',
-      '/customers/a',
+    renderApp(<Home />, { api, role, path: '/' });
+    return { api, user: userEvent.setup() };
+  };
+
+  it('jami qarz, qarzdorlar soni, ro‘yxat va eski qarz belgisi', async () => {
+    const { api } = setup();
+    expect(await screen.findByTestId('total-debt')).toHaveAccessibleName('12 480 000 so‘m');
+    expect(screen.getByText('23 qarzdor · bugun 4 ta yozuv')).toBeInTheDocument();
+    expect(screen.getByText('Baraka do‘koni')).toBeInTheDocument();
+    const olga = await screen.findByRole('link', { name: /Olga Petrovna/ });
+    expect(olga).toHaveAttribute('href', '/customers/a');
+    expect(within(olga).getByText(/oy oldin/)).toHaveClass('debt'); // eski qarz
+    expect(within(screen.getByRole('link', { name: /Murod/ })).getByText('bugun')).not.toHaveClass(
+      'debt',
     );
-    expect(api.customers).toHaveBeenCalledWith({ sort: 'debt', debtors: true, limit: 5 });
+    expect(api.customers).toHaveBeenCalledWith({ sort: 'debt', debtors: true, limit: 30 });
+  });
+
+  it('qidiruv qarzsiz mijozlarni ham topadi; topilmasa shu ism bilan qo‘shish taklif qilinadi', async () => {
+    const { api, user } = setup();
+    await screen.findByRole('link', { name: /Murod/ });
+    api.customers.mockResolvedValue(page([]));
+    await user.type(screen.getByRole('searchbox'), 'Aziz');
+    await waitFor(
+      () => expect(api.customers).toHaveBeenLastCalledWith({ q: 'Aziz', sort: 'debt', limit: 30 }),
+      { timeout: 2000 },
+    );
+    await user.click(await screen.findByRole('button', { name: '«Aziz» ni qo‘shish' }));
+    expect(await screen.findByTestId('elsewhere')).toBeInTheDocument();
+  });
+
+  it('“Hammasi” oxirgi faollik bo‘yicha; xodimda “Arxiv” yo‘q', async () => {
+    const { api, user } = setup('STAFF');
+    await screen.findByRole('link', { name: /Murod/ });
+    expect(screen.queryByRole('button', { name: 'Arxiv' })).not.toBeInTheDocument();
+    expect(screen.getByText('Xodim')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hammasi' }));
+    await waitFor(() =>
+      expect(api.customers).toHaveBeenLastCalledWith({ sort: 'recent', limit: 30 }),
+    );
+  });
+
+  it('“Yozuv” tugmasi mijoz tanlashga olib boradi', async () => {
+    setup();
+    expect(await screen.findByRole('link', { name: 'Yangi yozuv' })).toHaveAttribute(
+      'href',
+      '/pick/debt',
+    );
+  });
+
+  it('“Yana yuklash” keyingi sahifani kursor bilan oladi', async () => {
+    const api = fakeApi();
+    api.dashboard.mockResolvedValue(dashboard());
+    api.customers
+      .mockResolvedValueOnce(page([customer({ id: 'a', name: 'A' })], 'CUR1'))
+      .mockResolvedValueOnce(page([customer({ id: 'b', name: 'B' })]));
+    const user = userEvent.setup();
+    renderApp(<Home />, { api });
+    await user.click(await screen.findByRole('button', { name: 'Yana yuklash' }));
+    expect(await screen.findByRole('link', { name: /^B/ })).toBeInTheDocument();
+    expect(api.customers).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'CUR1' }));
   });
 
   it('xato bo‘lsa qayta urinish tugmasi', async () => {
     const api = fakeApi();
-    api.dashboard.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({
-      business: { id: 'b', name: 'B' },
-      role: 'OWNER',
-      summary: { totalDebt: 0, debtorsCount: 0, todayOperations: 0 },
-      subscription: { state: 'TRIAL', until: '2026-12-01T00:00:00Z', daysLeft: 9 },
-    });
+    api.dashboard
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValue(dashboard());
     api.customers.mockResolvedValue(page([]));
     const user = userEvent.setup();
-    renderApp(<Dashboard />, { api });
+    renderApp(<Home />, { api });
     expect(await screen.findByRole('alert')).toHaveTextContent('Internet bilan aloqa yo‘q.');
     await user.click(screen.getByRole('button', { name: 'Qayta urinish' }));
     expect(await screen.findByTestId('total-debt')).toBeInTheDocument();
   });
 });
 
-describe('Customers', () => {
-  it('ro‘yxat, qarz rangi va nom/yorliq', async () => {
+describe('PickCustomer', () => {
+  it('nasiya: oxirgi faol mijozlar, tanlansa yozuv ekraniga; yangi mijoz tugmasi', async () => {
     const api = fakeApi();
-    api.customers.mockResolvedValue(
-      page([
-        customer({ id: 'a', name: 'Murod', label: 'aka', balance: 5000 }),
-        customer({ id: 'b', name: 'Vali', balance: 0 }),
-      ]),
+    api.customers.mockResolvedValue(page([customer({ id: 'a', name: 'Ali', balance: 0 })]));
+    renderApp(<PickCustomer />, { api, route: '/pick/debt', path: '/pick/:kind' });
+    expect(await screen.findByRole('heading', { name: 'Kimga nasiya?' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Ali/ })).toHaveAttribute(
+      'href',
+      '/customers/a/add/debt',
     );
-    renderApp(<Customers />, { api });
-    expect(await screen.findByText('(aka)', { exact: false })).toBeInTheDocument();
-    expect(screen.getByText('5 000 so‘m')).toHaveClass('debt');
-    expect(screen.getByText('0 so‘m')).not.toHaveClass('debt');
+    expect(screen.getByRole('button', { name: 'Yangi mijoz' })).toBeInTheDocument();
+    expect(api.customers).toHaveBeenCalledWith({ sort: 'recent', limit: 30 });
   });
 
-  it('qidiruv kechiktirilgan holda so‘rov yuboradi; saralash tugmalari parametrni o‘zgartiradi', async () => {
+  it('to‘lov: faqat qarzdorlar, yangi mijoz tugmasi yo‘q', async () => {
     const api = fakeApi();
     api.customers.mockResolvedValue(page([]));
-    const user = userEvent.setup();
-    renderApp(<Customers />, { api });
-    await screen.findByText('Mijoz topilmadi');
-    await user.type(screen.getByRole('searchbox'), 'mur');
-    await waitFor(
-      () =>
-        expect(api.customers).toHaveBeenLastCalledWith(
-          expect.objectContaining({ q: 'mur', sort: 'debt' }),
-        ),
-      { timeout: 2000 },
-    );
-    await user.click(screen.getByRole('button', { name: 'Ism' }));
-    await waitFor(() =>
-      expect(api.customers).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name' })),
-    );
-    await user.click(screen.getByRole('button', { name: 'Faqat qarzdorlar' }));
-    await waitFor(() =>
-      expect(api.customers).toHaveBeenLastCalledWith(expect.objectContaining({ debtors: true })),
-    );
-  });
-
-  it('“Yana yuklash” keyingi sahifani kursor bilan oladi', async () => {
-    const api = fakeApi();
-    api.customers
-      .mockResolvedValueOnce(page([customer({ id: 'a', name: 'A' })], 'CUR1'))
-      .mockResolvedValueOnce(page([customer({ id: 'b', name: 'B' })]));
-    const user = userEvent.setup();
-    renderApp(<Customers />, { api });
-    await user.click(await screen.findByRole('button', { name: 'Yana yuklash' }));
-    expect(await screen.findByText('B')).toBeInTheDocument();
-    expect(api.customers).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'CUR1' }));
-    expect(screen.queryByRole('button', { name: 'Yana yuklash' })).not.toBeInTheDocument();
-  });
-
-  it('arxiv tugmasi faqat egasiga', async () => {
-    const api = fakeApi();
-    api.customers.mockResolvedValue(page([]));
-    renderApp(<Customers />, { api, role: 'STAFF' });
-    await screen.findByText('Mijoz topilmadi');
-    expect(screen.queryByRole('button', { name: 'Arxiv' })).not.toBeInTheDocument();
+    renderApp(<PickCustomer />, { api, route: '/pick/payment', path: '/pick/:kind' });
+    expect(await screen.findByText('Qarzi bor mijoz yo‘q')).toBeInTheDocument();
+    expect(api.customers).toHaveBeenCalledWith({ sort: 'recent', debtors: true, limit: 30 });
+    expect(screen.queryByRole('button', { name: 'Yangi mijoz' })).not.toBeInTheDocument();
   });
 });
 
 describe('CustomerNew', () => {
-  it('mijoz yaratadi (Idempotency-Key bilan) va uning sahifasiga o‘tadi', async () => {
+  it('mijoz yaratadi (Idempotency-Key bilan); ism qidiruvdan oldindan to‘ldiriladi', async () => {
     const api = fakeApi();
     api.createCustomer.mockResolvedValue(customer({ id: 'new1' }));
     const user = userEvent.setup();
-    renderApp(<CustomerNew />, { api, route: '/customers/new' });
-    await user.type(screen.getByLabelText('Ism'), '  Akmal ');
+    renderApp(<CustomerNew />, {
+      api,
+      route: '/customers/new?name=Akmal&then=debt',
+      path: '/customers/new',
+    });
+    expect(screen.getByLabelText('Ism')).toHaveValue('Akmal');
     await user.type(screen.getByLabelText('Telefon'), '90 123 45 67');
     await user.click(screen.getByRole('button', { name: 'Mijoz yaratish' }));
-    await waitFor(() => expect(api.createCustomer).toHaveBeenCalled());
-    expect(api.createCustomer).toHaveBeenCalledWith(
-      { name: 'Akmal', phone: '90 123 45 67' },
-      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    await waitFor(() =>
+      expect(api.createCustomer).toHaveBeenCalledWith(
+        { name: 'Akmal', phone: '90 123 45 67' },
+        expect.stringMatching(KEY),
+      ),
     );
+    expect(await screen.findByTestId('elsewhere')).toBeInTheDocument();
   });
 
   it('bir xil ismli mijoz: yorliq kiritish so‘raladi', async () => {
@@ -156,49 +189,58 @@ describe('CustomerNew', () => {
 });
 
 describe('CustomerDetail', () => {
+  const ledger = {
+    items: [
+      entry({
+        id: 'e3',
+        seq: 3,
+        type: 'ADJUSTMENT',
+        amount: -450000,
+        delta: -450000,
+        runningBalance: 0,
+        isReversal: true,
+        description: 'xato',
+      }),
+      entry({
+        id: 'e2',
+        seq: 2,
+        type: 'PAYMENT',
+        amount: 100,
+        delta: -100,
+        runningBalance: 450000,
+        reversedBy: null,
+        description: 'naqd',
+      }),
+      entry({ id: 'e1', seq: 1, reversedBy: 'e3' }),
+    ],
+    nextCursor: null,
+  };
   const setup = (
-    opts: { role?: 'OWNER' | 'STAFF'; cust?: Partial<ReturnType<typeof customer>> } = {},
+    opts: {
+      role?: 'OWNER' | 'STAFF';
+      cust?: Partial<ReturnType<typeof customer>>;
+      state?: unknown;
+      api?: FakeApi;
+    } = {},
   ) => {
-    const api = fakeApi();
+    const api = opts.api ?? fakeApi();
     api.customer.mockResolvedValue(customer(opts.cust));
-    api.ledger.mockResolvedValue({
-      items: [
-        entry({
-          id: 'e3',
-          seq: 3,
-          type: 'ADJUSTMENT',
-          amount: -450000,
-          delta: -450000,
-          runningBalance: 0,
-          isReversal: true,
-          description: 'xato',
-        }),
-        entry({
-          id: 'e2',
-          seq: 2,
-          type: 'PAYMENT',
-          amount: 100,
-          delta: -100,
-          runningBalance: 450000,
-          reversedBy: null,
-        }),
-        entry({ id: 'e1', seq: 1, reversedBy: 'e3' }),
-      ],
-      nextCursor: null,
-    });
+    api.ledger.mockResolvedValue(ledger);
     api.deleteEntry.mockResolvedValue({ balance: 0 });
     renderApp(<CustomerDetail />, {
       api,
       role: opts.role ?? 'OWNER',
       route: '/customers/c1',
       path: '/customers/:id',
+      state: opts.state,
     });
     return { api, user: userEvent.setup() };
   };
+  const t = (k: 'day.today' | 'day.yesterday') => translate('uz-Latn', k);
 
-  it('qoldiq, telefon, tarix qatorlari (o‘chirilgan belgisi, qoldiq)', async () => {
+  it('qoldiq, telefon, izoh, kun sarlavhasi va tarix qatorlari', async () => {
     setup({ cust: { phone: '+998901234567', notes: 'Yaqin do‘st' } });
-    expect(await screen.findByTestId('balance')).toHaveTextContent('450 000 so‘m');
+    expect(await screen.findByTestId('balance')).toHaveAccessibleName('450 000 so‘m');
     expect(screen.getByRole('link', { name: '+998901234567' })).toHaveAttribute(
       'href',
       'tel:+998901234567',
@@ -206,33 +248,50 @@ describe('CustomerDetail', () => {
     expect(screen.getByText('Yaqin do‘st')).toBeInTheDocument();
     const rows = await screen.findAllByRole('listitem');
     expect(rows).toHaveLength(3);
+    expect(
+      screen.getByRole('heading', { name: dayLabel('2026-10-07T10:00:00Z', 'uz-Latn', t) }),
+    ).toBeInTheDocument();
     expect(within(rows[0]!).getByText('O‘chirish')).toBeInTheDocument();
-    expect(within(rows[2]!).getByText(/o‘chirilgan/)).toBeInTheDocument();
     expect(rows[2]).toHaveClass('entry-deleted');
-    expect(within(rows[1]!).getByText('qoldiq 450 000 so‘m')).toBeInTheDocument();
+    expect(within(rows[2]!).getByText(/o‘chirilgan/)).toBeInTheDocument();
+    expect(within(rows[1]!).getByText('qoldiq 450 000')).toBeInTheDocument();
+    expect(within(rows[1]!).getByText('−100')).toHaveClass('pay');
   });
 
-  it('o‘chirilgan va storno yozuvlarda o‘chirish tugmasi yo‘q', async () => {
-    setup();
-    await screen.findAllByRole('listitem');
-    expect(screen.getAllByRole('button', { name: /O‘chirish/ })).toHaveLength(1); // faqat e2
-  });
-
-  it('o‘chirish: tasdiqlash oynasi, sabab, Idempotency-Key bilan yuboriladi', async () => {
+  it('o‘chirish: tafsilot → O‘chirish → sabab → Ha, o‘chirish (Idempotency-Key bilan)', async () => {
     const { api, user } = setup({ role: 'STAFF' });
-    await user.click(await screen.findByRole('button', { name: /O‘chirish To‘lov/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('To‘lov 100 so‘m o‘chiriladi. Tarixda iz qoladi.');
+    const rows = await screen.findAllByRole('listitem');
+    await user.click(within(rows[1]!).getByRole('button'));
+    const dialog = await screen.findByRole('dialog', { name: 'Yozuv tafsiloti' });
+    expect(within(dialog).getByText('450 100 → 450 000')).toBeInTheDocument();
+    expect(within(dialog).getByText('naqd')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: /O‘chirish To‘lov/ }));
+    expect(dialog).toHaveTextContent('Qoldiq 450 100 so‘mga qaytadi.');
     await user.type(within(dialog).getByLabelText('Sabab (ixtiyoriy)'), 'adashdim');
-    await user.click(within(dialog).getByRole('button', { name: 'O‘chirish' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Ha, o‘chirish' }));
     await waitFor(() =>
-      expect(api.deleteEntry).toHaveBeenCalledWith(
-        'e2',
-        'adashdim',
-        expect.stringMatching(/^[0-9a-f-]{36}$/),
-      ),
+      expect(api.deleteEntry).toHaveBeenCalledWith('e2', 'adashdim', expect.stringMatching(KEY)),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByText('O‘chirildi')).toBeInTheDocument();
+  });
+
+  it('“Yo‘q, qolsin” o‘chirmaydi; o‘chirilgan va storno yozuvlarda o‘chirish yo‘q', async () => {
+    const { api, user } = setup();
+    const rows = await screen.findAllByRole('listitem');
+    await user.click(within(rows[1]!).getByRole('button'));
+    await user.click(screen.getByRole('button', { name: /O‘chirish To‘lov/ }));
+    await user.click(screen.getByRole('button', { name: 'Yo‘q, qolsin' }));
+    expect(api.deleteEntry).not.toHaveBeenCalled();
+    await user.click(screen.getAllByRole('button', { name: 'Yopish' })[0]!);
+
+    for (const i of [0, 2]) {
+      await user.click(within(rows[i]!).getByRole('button'));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).queryByRole('button', { name: /O‘chirish/ })).not.toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Yopish' }));
+    }
   });
 
   it('keyingi to‘lovi bor nasiyani o‘chirishda aniq xabar', async () => {
@@ -240,173 +299,183 @@ describe('CustomerDetail', () => {
     api.deleteEntry.mockRejectedValue(
       new ApiError(409, 'CONFLICT', 'x', { reason: 'REVERSAL_WOULD_OVERDRAW' }),
     );
-    await user.click(await screen.findByRole('button', { name: /O‘chirish To‘lov/ }));
-    await user.click(
-      within(await screen.findByRole('dialog')).getByRole('button', { name: 'O‘chirish' }),
-    );
+    const rows = await screen.findAllByRole('listitem');
+    await user.click(within(rows[1]!).getByRole('button'));
+    await user.click(screen.getByRole('button', { name: /O‘chirish To‘lov/ }));
+    await user.click(screen.getByRole('button', { name: 'Ha, o‘chirish' }));
     expect(await screen.findByText('Avval keyingi to‘lovlarni o‘chiring.')).toBeInTheDocument();
   });
 
-  it('arxivlash faqat egasiga ko‘rinadi va qarzi bor mijozda o‘chirilgan', async () => {
-    setup({ role: 'STAFF' });
-    await screen.findByTestId('balance');
-    expect(screen.queryByRole('button', { name: 'Arxivlash' })).not.toBeInTheDocument();
+  it('saqlangandan keyin “Qaytarish”: yozuv o‘chiriladi va “Bekor qilindi”', async () => {
+    const { api, user } = setup({
+      state: { saved: { entryId: 'e9', type: 'payment', amount: 250000 } },
+    });
+    const toast = (await screen.findByText('To‘lov saqlandi · 250 000')).closest('.toast');
+    expect(toast).toHaveAttribute('role', 'status');
+    await user.click(within(toast as HTMLElement).getByRole('button', { name: 'Qaytarish' }));
+    await waitFor(() =>
+      expect(api.deleteEntry).toHaveBeenCalledWith('e9', undefined, expect.stringMatching(KEY)),
+    );
+    expect(await screen.findByText('Bekor qilindi')).toBeInTheDocument();
   });
 
-  it('egasi: qarzi bor mijozni arxivlab bo‘lmaydi; qarzsizini mumkin', async () => {
-    setup({ cust: { balance: 100 } });
-    expect(await screen.findByRole('button', { name: 'Arxivlash' })).toBeDisabled();
+  it('xodimda mijoz amallari menyusi yo‘q', async () => {
+    setup({ role: 'STAFF' });
+    await screen.findByTestId('balance');
+    expect(screen.queryByRole('button', { name: 'Mijoz amallari' })).not.toBeInTheDocument();
+  });
+
+  it('egasi: qarzi bor mijozni arxivlab bo‘lmaydi', async () => {
+    const { user } = setup({ cust: { balance: 100 } });
+    await user.click(await screen.findByRole('button', { name: 'Mijoz amallari' }));
+    expect(screen.getByRole('button', { name: 'Arxivlash' })).toBeDisabled();
     expect(screen.getByText('Qarzi bor mijozni arxivlab bo‘lmaydi.')).toBeInTheDocument();
   });
 
-  it('arxivdagi mijozda yozuv qo‘shish va o‘chirish yo‘q', async () => {
-    setup({ cust: { status: 'ARCHIVED', balance: 0 } });
+  it('arxivdagi mijozda yozuv qo‘shish va o‘chirish yo‘q; arxivdan chiqarish mumkin', async () => {
+    const { api, user } = setup({ cust: { status: 'ARCHIVED', balance: 0 } });
+    api.unarchive.mockResolvedValue(customer());
     expect(await screen.findByText('Bu mijoz arxivda.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Nasiya/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /O‘chirish/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Arxivdan chiqarish' })).toBeEnabled();
+    expect(screen.queryByRole('link', { name: /Qarz berdim/ })).not.toBeInTheDocument();
+    const rows = await screen.findAllByRole('listitem');
+    await user.click(within(rows[1]!).getByRole('button'));
+    expect(screen.queryByRole('button', { name: /O‘chirish To‘lov/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Yopish' }));
+    await user.click(screen.getByRole('button', { name: 'Mijoz amallari' }));
+    await user.click(screen.getByRole('button', { name: 'Arxivdan chiqarish' }));
+    await waitFor(() => expect(api.unarchive).toHaveBeenCalledWith('c1'));
   });
 });
 
-describe('Staff', () => {
+describe('Business', () => {
   const member = (over = {}) => ({
     userId: 'u2',
-    name: 'Sotuvchi',
-    username: 'sot',
+    name: 'Dilnoza',
+    username: null,
     role: 'STAFF',
     status: 'ACTIVE',
-    joinedAt: '2026-10-07T10:00:00Z',
+    joinedAt: '2026-10-05T10:00:00Z',
     revokedAt: null,
     ...over,
   });
-
-  it('taklif havolasi yaratiladi (Idempotency-Key bilan) va ko‘rsatiladi', async () => {
+  const setup = (opts: { role?: 'OWNER' | 'STAFF'; expired?: boolean } = {}) => {
     const api = fakeApi();
-    api.staff.mockResolvedValue({
-      members: [member({ userId: 'u1', name: 'Egasi', role: 'OWNER' }), member()],
-    });
-    api.invite.mockResolvedValue({
-      link: 'https://t.me/kissauzbot?start=inv_abc',
-      expiresAt: '2026-10-09T10:00:00Z',
-    });
-    const user = userEvent.setup();
-    renderApp(<Staff />, { api });
-    await user.click(await screen.findByRole('button', { name: 'Xodim taklif qilish' }));
-    expect(await screen.findByLabelText('link')).toHaveValue(
-      'https://t.me/kissauzbot?start=inv_abc',
-    );
-    expect(api.invite).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f-]{36}$/));
-  });
-
-  it('har bosishda yangi taklif (kalit almashadi)', async () => {
-    const api = fakeApi();
-    api.staff.mockResolvedValue({ members: [] });
-    api.invite.mockResolvedValue({ link: 'https://t.me/x', expiresAt: '2026-10-09T10:00:00Z' });
-    const user = userEvent.setup();
-    renderApp(<Staff />, { api });
-    const btn = await screen.findByRole('button', { name: 'Xodim taklif qilish' });
-    await user.click(btn);
-    await waitFor(() => expect(api.invite).toHaveBeenCalledTimes(1));
-    await user.click(btn);
-    await waitFor(() => expect(api.invite).toHaveBeenCalledTimes(2));
-    expect(api.invite.mock.calls[0]![0]).not.toBe(api.invite.mock.calls[1]![0]);
-  });
-
-  it('xodimni o‘chirish tasdiq bilan; egasida o‘chirish tugmasi yo‘q', async () => {
-    const api = fakeApi();
-    api.staff.mockResolvedValue({
-      members: [member({ userId: 'u1', name: 'Egasi', role: 'OWNER' }), member()],
-    });
-    api.revoke.mockResolvedValue(member({ status: 'REVOKED' }));
-    const user = userEvent.setup();
-    renderApp(<Staff />, { api });
-    await screen.findByText('Sotuvchi');
-    expect(screen.getAllByRole('button', { name: /O‘chirish/ })).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'O‘chirish Sotuvchi' }));
-    expect(
-      await screen.findByText('Sotuvchi biznesdan o‘chiriladi. Davom etasizmi?'),
-    ).toBeInTheDocument();
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'O‘chirish' }));
-    await waitFor(() => expect(api.revoke).toHaveBeenCalledWith('u2'));
-  });
-
-  it('o‘chirilgan xodim ro‘yxatda belgilanadi', async () => {
-    const api = fakeApi();
-    api.staff.mockResolvedValue({
-      members: [member({ status: 'REVOKED', revokedAt: '2026-10-08T00:00:00Z' })],
-    });
-    renderApp(<Staff />, { api });
-    expect(await screen.findByText(/o‘chirilgan/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /O‘chirish/ })).not.toBeInTheDocument();
-  });
-});
-
-describe('Settings', () => {
-  it('nomni o‘zgartirish va obuna ma’lumotlari', async () => {
-    const api = fakeApi();
-    api.business.mockResolvedValue({
-      id: 'biz-1',
-      name: 'Baraka',
-      shortCode: 'TD-AB2CD',
-      currency: 'UZS',
-      timezone: 'Asia/Tashkent',
-      notifyOwnerOnDelete: true,
-    });
+    const status = opts.expired
+      ? { state: 'EXPIRED', until: '2026-10-01T00:00:00Z', daysLeft: 0 }
+      : { state: 'TRIAL', until: '2026-10-22T10:00:00Z', daysLeft: 9 };
+    api.dashboard.mockResolvedValue(dashboard({ subscription: status }));
     api.billing.mockResolvedValue({
-      status: { state: 'TRIAL', until: '2026-10-21T10:00:00Z', daysLeft: 13 },
-      trialEndsAt: '2026-10-21T10:00:00Z',
+      status,
+      trialEndsAt: '2026-10-22T10:00:00Z',
       paidUntil: null,
       shortCode: 'TD-AB2CD',
       priceUzs: 29000,
       supportPhone: '+998907900110',
     });
+    api.business.mockResolvedValue({
+      id: 'biz-1',
+      name: 'Baraka do‘koni',
+      shortCode: 'TD-AB2CD',
+      currency: 'UZS',
+      timezone: 'Asia/Tashkent',
+      notifyOwnerOnDelete: true,
+    });
+    api.staff.mockResolvedValue({
+      members: [member({ userId: 'u1', name: 'Akbar', role: 'OWNER' }), member()],
+    });
     api.updateBusiness.mockResolvedValue({});
-    const user = userEvent.setup();
-    renderApp(<Settings />, { api });
+    renderApp(<Business />, { api, role: opts.role ?? 'OWNER' });
+    return { api, user: userEvent.setup() };
+  };
 
-    expect(await screen.findByText('Sinov muddati')).toBeInTheDocument();
-    expect(screen.getByText('Narx: 29 000 so‘m / oy')).toBeInTheDocument();
-    expect(screen.getByText('Biznes kodi: TD-AB2CD')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Admin: +998907900110' })).toHaveAttribute(
-      'href',
-      'tel:+998907900110',
+  it('egasi: obuna holati, narx, biznes kodi; uzaytirish tugmasi tayyor xabar bilan', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const { user } = setup();
+    const card = await screen.findByRole('region', { name: 'Obuna' });
+    expect(within(card).getByText('Sinov davri')).toBeInTheDocument();
+    expect(within(card).getByText('9 kun')).toBeInTheDocument();
+    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '9');
+    expect(await within(card).findByText(/Oyiga 29 000 so‘m/)).toBeInTheDocument();
+    expect(within(card).getByText('Biznes kodi: TD-AB2CD')).toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Obunani uzaytirish' }));
+    expect(new URL(open.mock.calls[0]![0] as string).searchParams.get('text')).toBe(
+      'Assalomu alaykum! Obuna muddatini uzaytirmoqchiman. ID: `TD-AB2CD`',
     );
-
-    const name = screen.getByLabelText('Biznes nomi');
-    await user.clear(name);
-    await user.type(name, 'Yangi nom');
-    await user.click(screen.getByRole('checkbox'));
-    await user.click(screen.getByRole('button', { name: 'Saqlash' }));
-    await waitFor(() =>
-      expect(api.updateBusiness).toHaveBeenCalledWith({
-        name: 'Yangi nom',
-        notifyOwnerOnDelete: false,
-      }),
-    );
-    expect(await screen.findByText('Saqlandi')).toBeInTheDocument();
+    open.mockRestore();
   });
 
   it('muddati tugagan obuna', async () => {
-    const api = fakeApi();
-    api.business.mockResolvedValue({
-      id: 'biz-1',
-      name: 'B',
-      shortCode: 'TD-AAAAA',
-      currency: 'UZS',
-      timezone: 'x',
-      notifyOwnerOnDelete: true,
+    setup({ expired: true });
+    const card = await screen.findByRole('region', { name: 'Obuna' });
+    expect(within(card).getByText('Muddati tugagan')).toBeInTheDocument();
+    expect(within(card).queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('nomni o‘zgartirish', async () => {
+    const { api, user } = setup();
+    await user.click(await screen.findByRole('button', { name: 'Nomini o‘zgartirish' }));
+    const input = screen.getByLabelText('Biznes nomi');
+    await user.clear(input);
+    await user.type(input, 'Yangi nom');
+    await user.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(api.updateBusiness).toHaveBeenCalledWith({ name: 'Yangi nom' }));
+  });
+
+  it('xodimlar: o‘zi belgilanadi, chiqarish tasdiq bilan; egasini chiqarib bo‘lmaydi', async () => {
+    const { api, user } = setup();
+    api.revoke.mockResolvedValue(member({ status: 'REVOKED' }));
+    expect(await screen.findByText('Akbar (siz)')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Chiqarish/ })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Chiqarish Dilnoza' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Dilnoza biznesdan chiqariladi. Davom etasizmi?');
+    await user.click(within(dialog).getByRole('button', { name: 'Chiqarish' }));
+    await waitFor(() => expect(api.revoke).toHaveBeenCalledWith('u2'));
+  });
+
+  it('taklif havolasi: har bosishda yangi kalit', async () => {
+    const { api, user } = setup();
+    api.invite.mockResolvedValue({
+      link: 'https://t.me/kissauzbot?start=inv_abc',
+      expiresAt: '2026-10-09T10:00:00Z',
     });
-    api.billing.mockResolvedValue({
-      status: { state: 'EXPIRED', until: '2026-10-01T00:00:00Z', daysLeft: 0 },
-      trialEndsAt: null,
-      paidUntil: null,
-      shortCode: 'TD-AAAAA',
-      priceUzs: 29000,
-      supportPhone: null,
+    const btn = await screen.findByRole('button', { name: 'Xodim taklif qilish' });
+    await user.click(btn);
+    expect(await screen.findByLabelText('Taklif havolasi')).toHaveValue(
+      'https://t.me/kissauzbot?start=inv_abc',
+    );
+    await user.click(btn);
+    await waitFor(() => expect(api.invite).toHaveBeenCalledTimes(2));
+    expect(api.invite.mock.calls[0]![0]).toMatch(KEY);
+    expect(api.invite.mock.calls[0]![0]).not.toBe(api.invite.mock.calls[1]![0]);
+  });
+
+  it('o‘chirish haqida xabar sozlamasi darhol saqlanadi', async () => {
+    const { api, user } = setup();
+    const toggle = await screen.findByRole('switch', {
+      name: 'Xodim yozuvni o‘chirsa menga xabar kelsin',
     });
-    renderApp(<Settings />, { api });
-    expect(await screen.findByText('Muddati tugagan')).toBeInTheDocument();
-    expect(screen.queryByText(/kun\)/)).not.toBeInTheDocument();
-    expect(vi.isMockFunction(api.billing)).toBe(true);
+    await waitFor(() => expect(toggle).toBeChecked());
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(api.updateBusiness).toHaveBeenCalledWith({ notifyOwnerOnDelete: false }),
+    );
+  });
+
+  it('alifbo almashtiriladi', async () => {
+    const { api, user } = setup();
+    api.setLocale.mockResolvedValue({ user: {} });
+    await user.click(await screen.findByRole('button', { name: 'Кирилл' }));
+    await waitFor(() => expect(api.setLocale).toHaveBeenCalledWith('uz-Cyrl'));
+  });
+
+  it('xodim: obuna holatini ko‘radi, xodimlar va narx bo‘limi yo‘q', async () => {
+    const { api } = setup({ role: 'STAFF' });
+    const card = await screen.findByRole('region', { name: 'Obuna' });
+    expect(within(card).getByText('9 kun')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Xodimlar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nomini o‘zgartirish' })).not.toBeInTheDocument();
+    expect(api.billing).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Lotin' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

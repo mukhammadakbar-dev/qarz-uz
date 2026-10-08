@@ -130,4 +130,21 @@ describe('HTTP: requireBusiness (server-side authorization)', () => {
     const res = await get('/api/me', u);
     expect(res.json().businesses).toEqual([{ id: biz, name: 'Mening do‘konim', role: 'OWNER' }]);
   });
+
+  it('PATCH /api/me faqat o‘z tilini o‘zgartiradi; noto‘g‘ri qiymat 400, tokensiz 401', async () => {
+    const u = await fx.createUser(pool);
+    const patch = (payload: unknown, auth = true) =>
+      app.inject({
+        method: 'PATCH',
+        url: '/api/me',
+        headers: auth ? { authorization: `Bearer ${token(u)}` } : {},
+        payload: payload as object,
+      });
+    const res = await patch({ locale: 'uz-Cyrl' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().user.locale).toBe('uz-Cyrl');
+    expect((await get('/api/me', u)).json().user.locale).toBe('uz-Cyrl');
+    expect((await patch({ locale: 'ru' })).statusCode).toBe(400);
+    expect((await patch({ locale: 'uz-Latn' }, false)).statusCode).toBe(401);
+  });
 });

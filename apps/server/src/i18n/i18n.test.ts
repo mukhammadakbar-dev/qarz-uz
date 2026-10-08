@@ -17,7 +17,7 @@ describe('i18n katalog', () => {
   });
 
   it('Kirill katalogida (til tugmalari va texnik nomlardan tashqari) Lotin matni qolmagan', () => {
-    const allowed = new Set<MessageKey>(['lang.button.latn']);
+    const allowed = new Set<MessageKey>(['lang.button.latn', 'kb.lang']);
     for (const key of keys) {
       if (allowed.has(key)) continue;
       const stripped = catalogs['uz-Cyrl'][key]
@@ -30,7 +30,12 @@ describe('i18n katalog', () => {
   });
 
   it('Lotin katalogida Kirill belgilari faqat til tugmasi va ikki tilli salomda', () => {
-    const allowed = new Set<MessageKey>(['lang.button.cyrl', 'welcome.new', 'lang.pick']);
+    const allowed = new Set<MessageKey>([
+      'lang.button.cyrl',
+      'welcome.new',
+      'lang.pick',
+      'kb.lang',
+    ]);
     for (const key of keys) {
       if (allowed.has(key)) continue;
       expect(/[А-Яа-яЁёЎўҚқҒғҲҳ]/.test(catalogs['uz-Latn'][key]), key).toBe(false);

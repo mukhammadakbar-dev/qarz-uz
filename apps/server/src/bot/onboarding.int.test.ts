@@ -194,16 +194,15 @@ describe('onboarding', () => {
     expect(p.last().text).toBe('Avval biznes yarating: /start');
   });
 
-  it('menyu: nom, rol, obuna holati, Mini App tugmasi va /invite ko‘rsatiladi', async () => {
+  it('menyu: nom, rol, obuna holati, /invite va pastki klaviatura ko‘rsatiladi', async () => {
     const p = await onboard('Sardor', 'Sardor savdo');
     await p.text('/menu');
     const { text, markup } = p.last();
     expect(text).toContain('«Sardor savdo» — Egasi');
     expect(text).toContain('sinov muddati');
     expect(text).toContain('/invite');
-    expect(buttons(markup)).toEqual([
-      expect.objectContaining({ web_app: { url: 'https://nasiya.example.uz/app' } }),
-    ]);
+    const keyboard = (markup as { keyboard?: { text: string }[][] } | undefined)?.keyboard;
+    expect(keyboard?.flat().map((b) => b.text)).toContain('💳 Obuna');
   });
 
   it('bepul sinov bir marta: ikkinchi biznes muddati tugagan, to‘lov raqami ko‘rsatiladi', async () => {
@@ -310,12 +309,12 @@ describe('boshqa buyruqlar', () => {
   it('/help va /lang', async () => {
     const p = new Person('Help');
     await p.text('/help');
-    expect(p.last().text).toContain('Murod 450 ming');
+    expect(p.last().text).toContain('Kissa qanday ishlaydi');
     await p.text('/lang');
     expect(buttons(p.last().markup)).toHaveLength(2);
     await p.press('lang:uz-Cyrl');
     await p.text('/help');
-    expect(p.last().text).toContain('Мурод 450 минг');
+    expect(p.last().text).toContain('Кисса қандай ишлайди');
   });
 
   it('noma’lum callback ma’lumoti e’tiborsiz qoldiriladi', async () => {

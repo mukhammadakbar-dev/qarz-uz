@@ -6,6 +6,7 @@ import { App } from './App';
 import { ApiClient } from './lib/api';
 import { initTelegram } from './lib/telegram';
 import { SessionProvider } from './state/session';
+import '@fontsource-variable/onest';
 import './styles.css';
 
 const tg = initTelegram();

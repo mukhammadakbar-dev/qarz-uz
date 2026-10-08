@@ -33,7 +33,8 @@ export interface Harness {
   /** RLS ni chetlab o'tuvchi rol: faqat tekshiruvlar uchun. */
   readonly sys: Pool;
   readonly sent: Sent[];
-  person(name: string): Person;
+  /** `id` berilsa shu Telegram ID bilan (masalan, superadmin). */
+  person(name: string, id?: number): Person;
   /** Odamni haqiqiy foydalanuvchi sifatida: onboarding orqali biznes ochadi. */
   owner(name: string, business?: string, lang?: 'uz-Latn' | 'uz-Cyrl'): Promise<Person>;
   /** Egasining havolasi orqali xodim sifatida ulanadi. */
@@ -48,7 +49,7 @@ let updateSeq = 40_000_000 + Math.floor(Math.random() * 1_000_000);
 let telegramSeq = 9_000_000_000 + Math.floor(Math.random() * 1_000_000);
 
 export async function createHarness(
-  options: { miniAppUrl?: string; ai?: AiDeps } = {},
+  options: { miniAppUrl?: string; ai?: AiDeps; superadminIds?: number[] } = {},
 ): Promise<Harness> {
   const config = loadConfig({
     NODE_ENV: 'test',
@@ -58,6 +59,7 @@ export async function createHarness(
     TELEGRAM_WEBHOOK_SECRET: SECRET,
     SESSION_SECRET: 'x'.repeat(32),
     SUPPORT_PHONE: '+998907900110',
+    ...(options.superadminIds ? { SUPERADMIN_TELEGRAM_IDS: options.superadminIds.join(',') } : {}),
     ...(options.miniAppUrl ? { MINIAPP_URL: options.miniAppUrl } : {}),
   });
   const pool = createPool(TEST_APP_URL, { max: 8 });
@@ -68,6 +70,7 @@ export async function createHarness(
     logger,
     pool,
     ai: options.ai,
+    sys,
     botInfo: {
       id: 1,
       is_bot: true,
@@ -104,8 +107,13 @@ export async function createHarness(
   };
 
   class PersonImpl implements Person {
-    readonly id = telegramSeq++;
-    constructor(readonly name: string) {}
+    readonly id: number;
+    constructor(
+      readonly name: string,
+      id?: number,
+    ) {
+      this.id = id ?? telegramSeq++;
+    }
     private from() {
       return { id: this.id, is_bot: false, first_name: this.name };
     }
@@ -191,7 +199,7 @@ export async function createHarness(
     pool,
     sys,
     sent,
-    person: (name) => new PersonImpl(name),
+    person: (name, id) => new PersonImpl(name, id),
     async owner(name, business = `${name} do‘koni`, lang = 'uz-Latn') {
       const p = new PersonImpl(name);
       await p.text('/start');

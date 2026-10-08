@@ -615,9 +615,34 @@ describe('obuna tugagan (read-only)', () => {
     expect(s.owner.last()).toBe(
       'Obuna muddati tugagan: yozish bloklangan, ko‘rish mumkin.\nTo‘lash uchun: +998907900110',
     );
+    // Bir bosishda uzaytirish so'rovi: admin chatida xabar biznes kodi bilan tayyor
+    const { short_code: code } = (
+      await h.sys.query('SELECT short_code FROM businesses WHERE id = $1', [s.businessId])
+    ).rows[0];
+    const button = s.owner.messages().at(-1)?.markup?.inline_keyboard?.[0]?.[0] as
+      { text: string; url?: string } | undefined;
+    expect(button?.text).toBe('💳 Obunani uzaytirish');
+    expect(new URL(button!.url!).searchParams.get('text')).toBe(
+      `Assalomu alaykum! Obuna muddatini uzaytirmoqchiman. ID: \`${code}\``,
+    );
     await s.owner.text('Murod qancha qarz?');
     expect(s.owner.last()).toBe('Murod\nQarz: 5 000 so‘m');
     expect(await s.drafts()).toEqual([]);
+    expect(await s.balance(c.id)).toBe(5000);
+  });
+
+  it('superadmin bloklagan do‘kon: alohida xabar, uzaytirish tugmasisiz; tasdiq ham yozmaydi', async () => {
+    const s = await shop();
+    const c = await s.customer('Murod', 5000);
+    await s.owner.text('Murod 100 berdi');
+    await h.sys.query('UPDATE businesses SET suspended_at = now() WHERE id = $1', [s.businessId]);
+    await s.owner.pressLabel('Saqlash');
+    expect(s.owner.last()).toContain('administrator tomonidan vaqtincha bloklangan');
+    await s.owner.text('Murod 100 yoz');
+    expect(s.owner.last()).toBe(
+      'Do‘kon administrator tomonidan vaqtincha bloklangan: yangi yozuv qo‘shib bo‘lmaydi, ko‘rish mumkin.',
+    );
+    expect(s.owner.buttons()).toEqual([]);
     expect(await s.balance(c.id)).toBe(5000);
   });
 
@@ -631,11 +656,12 @@ describe('obuna tugagan (read-only)', () => {
     );
     await s.owner.pressLabel('Saqlash');
     expect(s.owner.last()).toContain('Obuna muddati tugagan');
+    expect(s.owner.buttons().map((b) => b.text)).toEqual(['💳 Obunani uzaytirish']);
     expect(await s.balance(c.id)).toBe(5000);
   });
 });
 
-describe('mijoz yaratish va tez tugmalar', () => {
+describe('mijoz yaratish', () => {
   it('“Yangi mijoz Akmal +998…” telefon bilan', async () => {
     const s = await shop();
     await s.owner.text('Yangi mijoz Akmal +998 90 123 45 67');
@@ -653,28 +679,6 @@ describe('mijoz yaratish va tez tugmalar', () => {
     expect(s.owner.last()).toContain('«Murod» ismli mijoz bor');
     await s.owner.text('qo‘shni');
     expect(s.owner.last()).toContain('✓ Mijoz yaratildi: Murod (qo‘shni)');
-  });
-
-  it('“Qarzdorlar” tez tugmasi: jami va ro‘yxat', async () => {
-    const s = await shop();
-    await s.customer('Murod', 450000);
-    await s.customer('Ali', 250000);
-    await s.customer('Vali', 0);
-    await s.owner.text('👥 Qarzdorlar');
-    const t = s.owner.last();
-    expect(t).toContain('Qarzdorlar: 2 ta, jami 700 000 so‘m');
-    expect(t).toContain('1. Murod — 450 000 so‘m');
-    expect(t).toContain('2. Ali — 250 000 so‘m');
-    expect(t).not.toContain('Vali');
-    expect(s.owner.buttons()).toEqual([{ text: '📱 Ilovani ochish', data: undefined }]);
-  });
-
-  it('“Nasiya qo‘shish” va “To‘lov qo‘shish” tugmalari yo‘riqnoma beradi', async () => {
-    const s = await shop();
-    await s.owner.text('➕ Nasiya qo‘shish');
-    expect(s.owner.last()).toContain('Murod 50 ming');
-    await s.owner.text('💵 To‘lov qo‘shish');
-    expect(s.owner.last()).toContain('Murod 20 ming berdi');
   });
 });
 

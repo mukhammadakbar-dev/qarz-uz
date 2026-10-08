@@ -136,6 +136,7 @@ const NON_TENANT = new Set([
   'POST /telegram/webhook',
   'POST /api/auth/telegram',
   'GET /api/me',
+  'PATCH /api/me',
   'POST /api/businesses/active',
 ]);
 
@@ -204,6 +205,8 @@ describe('matritsa to‘liqligi', () => {
       h.app.registeredRoutes
         .filter((r) => r.method !== 'HEAD' && r.method !== 'OPTIONS')
         .filter((r) => !r.url.startsWith('/api/_t/'))
+        // Superadmin yo'llari alohida: admin.int.test.ts (oddiy foydalanuvchiga hammasi 404)
+        .filter((r) => !r.url.startsWith('/api/admin/'))
         .map((r) => `${r.method} ${r.url}`),
     );
     const covered = new Set([...MATRIX.map((m) => `${m.method} ${m.pattern}`), ...NON_TENANT]);

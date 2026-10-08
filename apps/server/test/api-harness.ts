@@ -6,6 +6,7 @@ import { createBot } from '../src/bot/bot.js';
 import { loadConfig } from '../src/config/index.js';
 import { createPool } from '../src/db/pool.js';
 import { buildServer } from '../src/http/server.js';
+import { BroadcastSender } from '../src/modules/admin/broadcast.js';
 import { issueSessionToken } from '../src/modules/identity/index.js';
 import { createLogger } from '../src/observability/logger.js';
 import { resolveBusinessAccess } from '../src/modules/tenancy/index.js';
@@ -30,6 +31,9 @@ export interface ApiHarness {
   readonly pool: Pool;
   readonly sys: Pool;
   readonly sentMessages: { chatId: number; text: string }[];
+  /** Botni bloklagan chatlar: ularga sendMessage 403 qaytaradi. */
+  readonly blockedChats: Set<number>;
+  readonly broadcasts: BroadcastSender;
   call(
     method: string,
     url: string,
@@ -81,9 +85,16 @@ export async function createApiHarness(
     } as UserFromGetMe,
   });
   const sentMessages: { chatId: number; text: string }[] = [];
+  const blockedChats = new Set<number>();
   bot.api.config.use(async (_prev, method, payload) => {
     if (method === 'sendMessage') {
       const p = payload as { chat_id: number; text: string };
+      if (blockedChats.has(p.chat_id))
+        return {
+          ok: false,
+          error_code: 403,
+          description: 'Forbidden: bot was blocked by the user',
+        } as never;
       sentMessages.push({ chatId: p.chat_id, text: p.text });
     }
     return {
@@ -91,7 +102,20 @@ export async function createApiHarness(
       result: { message_id: 1, date: 1, chat: { id: 1, type: 'private' } },
     } as never;
   });
-  const app = buildServer({ config, logger, pool, bot, miniAppDir: options.miniAppDir });
+  const broadcasts = new BroadcastSender({
+    sys,
+    logger,
+    send: (chatId, text) => bot.api.sendMessage(chatId, text),
+    intervalMs: 0,
+  });
+  const app = buildServer({
+    config,
+    logger,
+    pool,
+    bot,
+    miniAppDir: options.miniAppDir,
+    admin: { sys, broadcasts },
+  });
   await app.ready();
 
   const tokenFor = (userId: string) =>
@@ -102,6 +126,8 @@ export async function createApiHarness(
     pool,
     sys,
     sentMessages,
+    blockedChats,
+    broadcasts,
     tokenFor,
     async call(method, url, callOptions = {}) {
       const headers: Record<string, string> = { ...callOptions.headers };

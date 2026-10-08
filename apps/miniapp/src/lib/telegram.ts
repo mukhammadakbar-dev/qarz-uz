@@ -61,6 +61,8 @@ export function initTelegram(): TelegramEnv {
   );
   safe(() => backButton.mount());
   safe(() => miniApp.ready());
+  applyColorScheme();
+  safe(() => themeParams.isDark.sub(applyColorScheme));
 
   let initData = '';
   let startParam: string | null = null;
@@ -78,6 +80,16 @@ export function initTelegram(): TelegramEnv {
   const queryCustomer = new URLSearchParams(globalThis.location?.search ?? '').get('c');
   if (!startParam && queryCustomer) startParam = `c_${queryCustomer}`;
   return { initData, startParam, inTelegram: true };
+}
+
+/**
+ * Telegram mavzusi qorong'imi? Dizayn ranglari (qarz/to'lov) shunga moslashadi: `<html data-theme>`.
+ * Telegramdan tashqarida tizim sozlamasi ishlaydi (CSS media query).
+ */
+function applyColorScheme(): void {
+  safe(() => {
+    document.documentElement.dataset['theme'] = themeParams.isDark() ? 'dark' : 'light';
+  });
 }
 
 export function haptic(kind: 'success' | 'error' | 'light'): void {

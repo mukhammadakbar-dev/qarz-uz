@@ -13,6 +13,7 @@ import { UnauthorizedError, ValidationError } from '../errors/index.js';
 import {
   findUserById,
   issueSessionToken,
+  setLocale,
   upsertTelegramUser,
   verifyInitData,
   verifySessionToken,
@@ -39,6 +40,8 @@ declare module 'fastify' {
 export interface AuthDeps {
   readonly config: Pick<Config, 'telegram' | 'session'>;
   readonly pool: Pool;
+  /** Superadmin panel ochiqmi (faqat Mini App'da "Admin" bo'limini ko'rsatish uchun; himoya serverda). */
+  readonly isSuperadmin?: (user: User) => boolean;
 }
 
 const loginBody = z.object({ initData: z.string().min(1).max(8192) });
@@ -78,6 +81,8 @@ export function createRequireBusiness(deps: AuthDeps) {
     };
   };
 }
+
+const localeBody = z.object({ locale: z.enum(['uz-Latn', 'uz-Cyrl']) });
 
 const publicUser = (u: User) => ({
   id: u.id,
@@ -120,6 +125,16 @@ export function registerAuthRoutes<L extends FastifyBaseLogger>(
       user: publicUser(user),
       activeBusinessId: user.activeBusinessId,
       businesses: memberships.map((m) => ({ id: m.businessId, name: m.name, role: m.role })),
+      isSuperadmin: deps.isSuperadmin?.(user) ?? false,
     };
+  });
+
+  // Faqat o'z sozlamasi (til); bot ham shu tilda javob beradi
+  app.patch('/api/me', { preHandler: authenticate }, async (request) => {
+    const parsed = localeBody.safeParse(request.body);
+    if (!parsed.success) throw new ValidationError('locale noto‘g‘ri');
+    const user = request.user!;
+    await setLocale(deps.pool, user.id, parsed.data.locale);
+    return { user: publicUser({ ...user, locale: parsed.data.locale }) };
   });
 }

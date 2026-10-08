@@ -1,3 +1,4 @@
+import { subscriptionRequestUrl } from '@nasiya/shared';
 import { InlineKeyboard, type Bot } from 'grammy';
 import type { Pool } from 'pg';
 import type { Config } from '../../config/index.js';
@@ -15,6 +16,7 @@ import { setLocale, type Locale } from '../../modules/identity/index.js';
 import {
   createBusinessWithOwner,
   createInvite,
+  getBusinessSettings,
   listMemberships,
   redeemInvite,
   resolveBusinessAccess,
@@ -23,6 +25,7 @@ import {
 } from '../../modules/tenancy/index.js';
 import type { Logger } from '../../observability/logger.js';
 import type { BotContext } from '../bot.js';
+import { mainKeyboard } from '../ui/keyboards.js';
 
 export const STATE_AWAIT_BUSINESS_NAME = 'ONBOARDING_AWAIT_BUSINESS_NAME';
 const TIMEZONE = 'Asia/Tashkent';
@@ -46,7 +49,7 @@ export function formatDate(date: Date, timeZone = TIMEZONE): string {
     .replaceAll('/', '.');
 }
 
-function describeStatus(ctx: BotContext, status: SubscriptionStatus): string {
+export function describeStatus(ctx: BotContext, status: SubscriptionStatus): string {
   const date = formatDate(status.until);
   if (status.state === 'TRIAL') return ctx.t('status.trial', { date, days: status.daysLeft });
   if (status.state === 'ACTIVE') return ctx.t('status.active', { date });
@@ -58,7 +61,28 @@ const supportLine = (ctx: BotContext, deps: HandlerDeps): string =>
     ? ctx.t('status.pay', { phone: deps.config.billing.supportPhone })
     : '';
 
-async function loadStatus(deps: HandlerDeps, access: BusinessAccess): Promise<SubscriptionStatus> {
+/**
+ * "Obunani uzaytirish" tugmasi: admin chatini ochadi, xabar biznes kodi bilan oldindan yozilgan.
+ * Admin raqami sozlanmagan bo'lsa tugma yo'q.
+ */
+export async function renewKeyboard(
+  ctx: BotContext,
+  deps: Pick<HandlerDeps, 'config' | 'pool'>,
+  access: BusinessAccess,
+): Promise<InlineKeyboard | undefined> {
+  const phone = deps.config.billing.supportPhone;
+  if (!phone) return undefined;
+  const { shortCode } = await getBusinessSettings(deps.pool, access);
+  return new InlineKeyboard().url(
+    ctx.t('button.contactAdmin'),
+    subscriptionRequestUrl(phone, ctx.user.locale, shortCode),
+  );
+}
+
+export async function loadStatus(
+  deps: HandlerDeps,
+  access: BusinessAccess,
+): Promise<SubscriptionStatus> {
   const { rows } = await withTenant(
     deps.pool,
     { businessId: access.businessId, userId: access.userId },
@@ -74,12 +98,12 @@ async function loadStatus(deps: HandlerDeps, access: BusinessAccess): Promise<Su
   return subscriptionStatus({ trialEndsAt: row.trial_ends_at, paidUntil: row.paid_until });
 }
 
-const langKeyboard = (ctx: BotContext) =>
+export const langKeyboard = (ctx: BotContext) =>
   new InlineKeyboard()
     .text(ctx.t('lang.button.latn'), 'lang:uz-Latn')
     .text(ctx.t('lang.button.cyrl'), 'lang:uz-Cyrl');
 
-async function businessName(deps: HandlerDeps, access: BusinessAccess): Promise<string> {
+export async function businessName(deps: HandlerDeps, access: BusinessAccess): Promise<string> {
   const memberships = await listMemberships(deps.pool, access.userId);
   return memberships.find((m) => m.businessId === access.businessId)?.name ?? '';
 }
@@ -99,11 +123,37 @@ export async function showMenu(
   ];
   if (status.state === 'EXPIRED') lines.push(supportLine(ctx, deps));
   if (access.role === 'OWNER') lines.push(ctx.t('menu.invite'));
+  // Pastki klaviatura shu xabar bilan o'rnatiladi (Mini App chat menyu tugmasida)
+  await ctx.reply(`${lines.filter(Boolean).join('\n')}\n\n${ctx.t('menu.hint')}`, {
+    reply_markup: mainKeyboard(ctx),
+  });
+}
 
-  const appUrl = deps.config.telegram.miniAppUrl;
-  const keyboard = appUrl ? new InlineKeyboard().webApp(ctx.t('menu.openApp'), appUrl) : undefined;
-  if (!appUrl) lines.push(ctx.t('menu.noApp'));
-  await ctx.reply(lines.filter(Boolean).join('\n'), keyboard ? { reply_markup: keyboard } : {});
+/** Foydalanuvchining bizneslari ro'yxati (tanlash tugmalari bilan). */
+export async function sendBusinessChooser(ctx: BotContext, deps: HandlerDeps): Promise<void> {
+  const memberships = await listMemberships(deps.pool, ctx.user.id);
+  const keyboard = new InlineKeyboard();
+  for (const m of memberships) keyboard.text(m.name, `biz:${m.businessId}`).row();
+  await ctx.reply(ctx.t('start.choose'), { reply_markup: keyboard });
+}
+
+/** Xodim taklifi havolasini yaratadi va yuboradi (faqat egasi). */
+export async function sendInvite(
+  ctx: BotContext,
+  deps: HandlerDeps,
+  access: BusinessAccess,
+): Promise<void> {
+  try {
+    const invite = await createInvite(deps.pool, access);
+    const link = `https://t.me/${deps.botUsername()}?start=inv_${invite.token}`;
+    await ctx.reply(ctx.t('invite.created', { link }), {
+      link_preview_options: { is_disabled: true },
+    });
+  } catch (error) {
+    if (error instanceof ForbiddenError) return void (await ctx.reply(ctx.t('error.forbidden')));
+    if (error instanceof ConflictError) return void (await ctx.reply(ctx.t('error.generic')));
+    throw error;
+  }
 }
 
 /** Foydalanuvchi uchun "uy" ekrani: biznes bo'lmasa onboarding, bir nechta bo'lsa tanlash, aks holda menyu. */
@@ -117,10 +167,7 @@ export async function showHome(ctx: BotContext, deps: HandlerDeps): Promise<void
       await ctx.reply(ctx.t('welcome.new'), { reply_markup: langKeyboard(ctx) });
       return;
     }
-    const memberships = await listMemberships(deps.pool, ctx.user.id);
-    const keyboard = new InlineKeyboard();
-    for (const m of memberships) keyboard.text(m.name, `biz:${m.businessId}`).row();
-    await ctx.reply(ctx.t('start.choose'), { reply_markup: keyboard });
+    await sendBusinessChooser(ctx, deps);
   }
 }
 
@@ -169,8 +216,6 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
     return showHome(ctx, deps);
   });
 
-  bot.command('help', (ctx) => ctx.reply(ctx.t('help')));
-
   bot.command('app', (ctx) => {
     const url = deps.config.telegram.miniAppUrl;
     if (!url) return ctx.reply(ctx.t('menu.noApp'));
@@ -179,8 +224,6 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
     });
   });
 
-  bot.command('lang', (ctx) => ctx.reply(ctx.t('lang.pick'), { reply_markup: langKeyboard(ctx) }));
-
   bot.callbackQuery(/^lang:(uz-Latn|uz-Cyrl)$/, async (ctx) => {
     const locale = ctx.match[1]!;
     if (!isLocale(locale)) return;
@@ -188,13 +231,16 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
     await setLocale(pool, ctx.user.id, locale);
     ctx.user = { ...ctx.user, locale };
     await ctx.editMessageReplyMarkup().catch(() => undefined);
-    await ctx.reply(ctx.t('lang.chosen'));
 
     const memberships = await listMemberships(pool, ctx.user.id);
     if (memberships.length === 0) {
+      await ctx.reply(ctx.t('lang.chosen'));
       await setState(pool, ctx.user.id, STATE_AWAIT_BUSINESS_NAME);
       await ctx.reply(ctx.t('onboarding.askName'));
+      return;
     }
+    // Pastki klaviatura yangi tilda qayta o'rnatiladi
+    await ctx.reply(ctx.t('lang.chosen'), { reply_markup: mainKeyboard(ctx) });
   });
 
   bot.callbackQuery(/^biz:([0-9a-f-]{36})$/, async (ctx) => {
@@ -218,23 +264,15 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
       if (error instanceof BusinessRequiredError) return ctx.reply(ctx.t('error.noBusiness'));
       throw error;
     }
-    try {
-      const invite = await createInvite(pool, access);
-      const link = `https://t.me/${deps.botUsername()}?start=inv_${invite.token}`;
-      await ctx.reply(ctx.t('invite.created', { link }), {
-        link_preview_options: { is_disabled: true },
-      });
-    } catch (error) {
-      if (error instanceof ForbiddenError) return ctx.reply(ctx.t('error.forbidden'));
-      if (error instanceof ConflictError) return ctx.reply(ctx.t('error.generic'));
-      throw error;
-    }
+    await sendInvite(ctx, deps, access);
   });
 
   // Biznes nomini kutish holati
   bot.on('message:text', async (ctx, next) => {
     const state = await getState(pool, ctx.user.id);
-    if (state?.state !== STATE_AWAIT_BUSINESS_NAME) return next();
+    // Buyruqlar (/help, /til...) nom sifatida olinmaydi: o'z handleriga o'tadi, holat saqlanadi
+    if (state?.state !== STATE_AWAIT_BUSINESS_NAME || ctx.message.text.startsWith('/'))
+      return next();
 
     try {
       const created = await createBusinessWithOwner(pool, ctx.user.id, ctx.message.text, {
@@ -248,6 +286,7 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
             days: deps.config.billing.trialDays,
             date: formatDate(created.trialEndsAt),
           }),
+          { reply_markup: mainKeyboard(ctx) },
         );
       } else {
         await ctx.reply(
@@ -255,6 +294,7 @@ export function registerOnboarding(bot: Bot<BotContext>, deps: HandlerDeps): voi
             name: created.name,
             support: supportLine(ctx, deps),
           }),
+          { reply_markup: mainKeyboard(ctx) },
         );
       }
     } catch (error) {

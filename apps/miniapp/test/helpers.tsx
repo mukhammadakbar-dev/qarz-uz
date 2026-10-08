@@ -6,11 +6,12 @@ import { vi } from 'vitest';
 import type { ApiClient } from '../src/lib/api';
 import { I18nProvider } from '../src/lib/i18n';
 import type { Customer, HistoryItem, Locale, Me, Role } from '../src/lib/types';
-import { SessionContext, type Session } from '../src/state/session';
+import { CoreContext, SessionContext, type Session } from '../src/state/session';
 
 /** Soxta API: har bir metod vi.fn(); testlar kerakli javobni beradi. */
 const API_NAMES = [
   'me',
+  'setLocale',
   'switchBusiness',
   'dashboard',
   'customers',
@@ -29,6 +30,18 @@ const API_NAMES = [
   'business',
   'updateBusiness',
   'billing',
+  'adminStats',
+  'adminBusinesses',
+  'adminBusiness',
+  'adminCustomers',
+  'adminCustomer',
+  'adminLedger',
+  'adminExtend',
+  'adminSuspend',
+  'adminUnsuspend',
+  'adminBroadcastPreview',
+  'adminBroadcast',
+  'adminBroadcasts',
 ] as const;
 export type FakeApi = Record<(typeof API_NAMES)[number], ReturnType<typeof vi.fn>> & {
   businessId: string | null;
@@ -50,6 +63,7 @@ export const customer = (over: Partial<Customer> = {}): Customer => ({
   balance: 450000,
   createdAt: '2026-10-07T10:00:00Z',
   updatedAt: '2026-10-07T10:00:00Z',
+  lastActivityAt: '2026-10-07T10:00:00Z',
   ...over,
 });
 
@@ -87,23 +101,43 @@ export function session(api: FakeApi, role: Role = 'OWNER', locale: Locale = 'uz
 
 export function renderApp(
   ui: ReactElement,
-  options: { api: FakeApi; role?: Role; locale?: Locale; route?: string; path?: string },
+  options: {
+    api: FakeApi;
+    role?: Role;
+    locale?: Locale;
+    route?: string;
+    path?: string;
+    /** Marshrut holati (masalan, AddEntry → CustomerDetail "saqlandi"). */
+    state?: unknown;
+    superadmin?: boolean;
+  },
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const s = session(options.api, options.role, options.locale);
+  const [pathname = '/', search = ''] = (options.route ?? '/').split('?');
+  const initial = { pathname, search: search ? `?${search}` : '', state: options.state };
   return render(
     <QueryClientProvider client={client}>
       <I18nProvider locale={s.locale}>
-        <SessionContext.Provider value={s}>
-          <MemoryRouter initialEntries={[options.route ?? '/']}>
-            <Routes>
-              <Route path={options.path ?? '*'} element={ui} />
-              <Route path="*" element={<div data-testid="elsewhere" />} />
-            </Routes>
-          </MemoryRouter>
-        </SessionContext.Provider>
+        <CoreContext.Provider
+          value={{
+            api: s.api,
+            me: { ...s.me, isSuperadmin: options.superadmin ?? false },
+            locale: s.locale,
+            isSuperadmin: options.superadmin ?? false,
+          }}
+        >
+          <SessionContext.Provider value={s}>
+            <MemoryRouter initialEntries={[initial]}>
+              <Routes>
+                <Route path={options.path ?? '*'} element={ui} />
+                <Route path="*" element={<div data-testid="elsewhere" />} />
+              </Routes>
+            </MemoryRouter>
+          </SessionContext.Provider>
+        </CoreContext.Provider>
       </I18nProvider>
     </QueryClientProvider>,
   );

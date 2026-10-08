@@ -54,7 +54,7 @@ new_paid_until = max(now, paid_until ?? now, trial_ends_at) + N oy
 
 - `SUPERADMIN_TELEGRAM_IDS` (env, vergul bilan). Faqat shu foydalanuvchilar admin buyruqlarini ishlata oladi.
 - Buyruqlar: `/sub <kod>` (holat), `/extend <kod> <oy> [izoh]`, `/expiring` (7 kun ichida tugaydiganlar).
-- Superadmin **biznes ma'lumotlarini (mijoz, qarz) ko‘ra olmaydi**. U faqat billing metama'lumotini ko‘radi (nom, kod, muddat, owner).
+- ~~Superadmin biznes ma'lumotlarini (mijoz, qarz) ko‘ra olmaydi.~~ **O‘zgartirildi (ADR-0008):** superadmin do‘kon ma'lumotlarini faqat o‘qiy oladi, har bir ko‘rish audit'ga yoziladi; do‘kon nomidan yozuv qila olmaydi.
 - Har bir buyruq audit'ga yoziladi (`actor`, `business`, `before`, `after`).
 - `/extend` idempotent emas (takroriy chaqiruv yana uzaytiradi). Shuning uchun natija xabarida aniq yangi sana ko‘rsatiladi va bot tasdiq tugmasi so‘raydi.
 

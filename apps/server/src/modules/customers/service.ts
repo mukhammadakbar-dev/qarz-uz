@@ -20,6 +20,8 @@ export interface Customer {
   readonly balance: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /** Oxirgi yozuv (yoki yaratilish) vaqti: qarz qancha vaqtdan beri turganini ko'rsatish uchun. */
+  readonly lastActivityAt: Date;
 }
 
 interface CustomerRow {
@@ -32,10 +34,12 @@ interface CustomerRow {
   balance: string;
   created_at: Date;
   updated_at: Date;
+  last_activity_at: Date;
 }
 
 const SELECT = `
-  SELECT c.id, c.name, c.label, c.phone, c.notes, c.status, b.balance, c.created_at, c.updated_at
+  SELECT c.id, c.name, c.label, c.phone, c.notes, c.status, b.balance, c.created_at, c.updated_at,
+         b.updated_at AS last_activity_at
     FROM customers c
     JOIN customer_balances b ON b.customer_id = c.id AND b.business_id = c.business_id`;
 
@@ -49,6 +53,7 @@ const toCustomer = (r: CustomerRow): Customer => ({
   balance: Number(r.balance),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+  lastActivityAt: r.last_activity_at,
 });
 
 const IDENTITY_INDEX = 'customers_identity_uq';
@@ -350,7 +355,8 @@ export async function unarchiveCustomer(
 
 // ───────── Qidiruv, saralash, kursor bo'yicha sahifalash ─────────
 
-export type CustomerSort = 'debt' | 'newest' | 'name';
+/** recent: oxirgi yozuv (yoki yaratilish) vaqti bo'yicha, eng yangisi birinchi. */
+export type CustomerSort = 'debt' | 'newest' | 'name' | 'recent';
 
 export interface SearchCustomersInput {
   readonly q?: string;
@@ -370,6 +376,7 @@ const cursorSchema = z.discriminatedUnion('s', [
   z.object({ s: z.literal('debt'), v: z.string().regex(/^\d+$/), id: z.string().uuid() }),
   z.object({ s: z.literal('newest'), v: z.string().min(10).max(40), id: z.string().uuid() }),
   z.object({ s: z.literal('name'), v: z.string().max(200), id: z.string().uuid() }),
+  z.object({ s: z.literal('recent'), v: z.string().min(10).max(40), id: z.string().uuid() }),
 ]);
 
 const encodeCursor = (c: z.infer<typeof cursorSchema>): string =>
@@ -435,6 +442,17 @@ export async function searchCustomers(
       const id = add(cur.id);
       where.push(
         `(c.created_at < ${v}::timestamptz OR (c.created_at = ${v}::timestamptz AND c.id > ${id}::uuid))`,
+      );
+    }
+  } else if (sort === 'recent') {
+    orderBy = 'b.updated_at DESC, c.id ASC';
+    cursorValueSql = 'b.updated_at::text';
+    if (input.cursor) {
+      const cur = decodeCursor(input.cursor, sort);
+      const v = add(cur.v);
+      const id = add(cur.id);
+      where.push(
+        `(b.updated_at < ${v}::timestamptz OR (b.updated_at = ${v}::timestamptz AND c.id > ${id}::uuid))`,
       );
     }
   } else {

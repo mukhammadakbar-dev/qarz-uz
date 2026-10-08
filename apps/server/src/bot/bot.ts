@@ -9,7 +9,9 @@ import { runWithContext, setContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { KeyedMutex } from '../util/keyed-mutex.js';
 import type { AiDeps } from '../modules/interpretation/service.js';
+import { registerAdmin } from './handlers/admin.js';
 import { registerAssistant } from './handlers/assistant.js';
+import { registerMenu } from './handlers/menu.js';
 import { registerOnboarding } from './handlers/onboarding.js';
 
 /** Faqat kerakli update turlari (ADR-0006 §1). */
@@ -37,6 +39,8 @@ export interface BotDeps {
   readonly handlers?: boolean;
   /** Gemini (ixtiyoriy). Berilmasa faqat rule parser ishlaydi. */
   readonly ai?: AiDeps | undefined;
+  /** `nasiya_system` pool: superadmin buyruqlari (/sub, /extend, /expiring). Berilmasa ular o'chiq. */
+  readonly sys?: Pool | undefined;
 }
 
 /**
@@ -115,12 +119,16 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
   if (deps.handlers === false) return bot;
 
-  registerOnboarding(bot, {
+  const handlerDeps = {
     config: deps.config,
     pool,
     logger,
     botUsername: () => bot.botInfo.username,
-  });
+  };
+  registerOnboarding(bot, handlerDeps);
+  registerAdmin(bot, { config: deps.config, pool, sys: deps.sys, logger });
+  // Pastki klaviatura matnlari tabiiy matn tahliliga tushmasligi uchun assistant'dan oldin
+  registerMenu(bot, handlerDeps);
 
   registerAssistant(bot, { config: deps.config, pool, logger, ai: deps.ai });
 

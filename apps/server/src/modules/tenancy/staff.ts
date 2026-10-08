@@ -107,6 +107,8 @@ export interface BusinessSettings {
   readonly currency: string;
   readonly timezone: string;
   readonly notifyOwnerOnDelete: boolean;
+  /** Superadmin bloklaganmi (bloklangan do'kon faqat o'qiladi). */
+  readonly suspended: boolean;
 }
 
 const settingsPatch = z
@@ -129,8 +131,11 @@ export async function getBusinessSettings(
         currency: string;
         timezone: string;
         notify_owner_on_delete: boolean;
+        suspended: boolean;
       }>(
-        'SELECT id, name, short_code, currency, timezone, notify_owner_on_delete FROM businesses WHERE id = $1',
+        `SELECT id, name, short_code, currency, timezone, notify_owner_on_delete,
+                suspended_at IS NOT NULL AS suspended
+           FROM businesses WHERE id = $1`,
         [access.businessId],
       ),
     'customer.view',
@@ -144,6 +149,7 @@ export async function getBusinessSettings(
     currency: r.currency,
     timezone: r.timezone,
     notifyOwnerOnDelete: r.notify_owner_on_delete,
+    suspended: r.suspended,
   };
 }
 

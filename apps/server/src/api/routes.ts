@@ -82,7 +82,7 @@ const adjustmentBody = z.object({ amount: int, description: z.string().min(1).ma
 const deleteBody = z.object({ reason: z.string().max(500).nullish() }).default({});
 const listQuery = z.object({
   q: z.string().max(100).optional(),
-  sort: z.enum(['debt', 'newest', 'name']).optional(),
+  sort: z.enum(['debt', 'newest', 'name', 'recent']).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().max(400).optional(),
   status: z.enum(['ACTIVE', 'ARCHIVED']).optional(),
@@ -146,7 +146,7 @@ export function registerApi<L extends FastifyBaseLogger>(app: App<L>, deps: ApiD
       loadBilling(pool, access),
     ]);
     return {
-      business: { id: settings.id, name: settings.name },
+      business: { id: settings.id, name: settings.name, suspended: settings.suspended },
       role: access.role,
       summary,
       subscription: billing.status,

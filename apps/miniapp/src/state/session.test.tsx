@@ -119,8 +119,53 @@ describe('SessionProvider darvozasi', () => {
       me({ user: { id: 'u', firstName: 'A', username: null, locale: 'uz-Cyrl' } }),
     );
     mount(api);
-    expect(await screen.findByText('Жами қарздорлик')).toBeInTheDocument();
+    expect(await screen.findByText('Жами қарз')).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('uz-Cyrl');
+  });
+});
+
+describe('superadmin', () => {
+  const stats = {
+    businesses: 3,
+    trial: 1,
+    active: 1,
+    expired: 1,
+    suspended: 0,
+    expiringSoon: 0,
+    newThisWeek: 1,
+    users: 5,
+    customers: 10,
+    totalDebt: 1000,
+    entriesToday: 2,
+    revenueThisMonth: 29000,
+  };
+
+  it('do‘koni yo‘q superadmin faqat panelni ko‘radi', async () => {
+    const api = fakeApi();
+    api.me.mockResolvedValue(me({ businesses: [], activeBusinessId: null, isSuperadmin: true }));
+    api.adminStats.mockResolvedValue(stats);
+    api.adminBusinesses.mockResolvedValue({ items: [], nextCursor: null });
+    mount(api);
+    expect(await screen.findByRole('heading', { name: 'Admin panel' })).toBeInTheDocument();
+    const nav = screen.getByRole('navigation');
+    expect(nav).toHaveTextContent('Admin');
+    expect(nav).not.toHaveTextContent('Daftar');
+    expect(api.dashboard).not.toHaveBeenCalled();
+  });
+
+  it('do‘koni bor superadmin: uchinchi “Admin” tabi; oddiy foydalanuvchida yo‘q, /admin ga kira olmaydi', async () => {
+    const api = fakeApi();
+    api.me.mockResolvedValue(me({ isSuperadmin: true }));
+    const view = mount(api);
+    expect(await screen.findByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin');
+    view.unmount();
+
+    const plain = fakeApi();
+    plain.me.mockResolvedValue(me());
+    mount(plain, null, '/admin');
+    expect(await screen.findByTestId('total-debt')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+    expect(plain.adminStats).not.toHaveBeenCalled();
   });
 });
 
@@ -142,11 +187,19 @@ describe('App: chuqur havola va rol himoyasi', () => {
     expect(api.customer).not.toHaveBeenCalled();
   });
 
-  it('xodim /staff va /settings ga kira olmaydi: bosh sahifaga qaytariladi', async () => {
+  it('xodim eski /staff manzilidan Biznes sahifasiga o‘tadi, xodimlar ro‘yxati so‘ralmaydi', async () => {
     const api = fakeApi();
     api.me.mockResolvedValue(me({ businesses: [{ id: 'b1', name: 'Baraka', role: 'STAFF' }] }));
     mount(api, null, '/staff');
-    expect(await screen.findByTestId('total-debt')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Obuna' })).toBeInTheDocument();
     expect(api.staff).not.toHaveBeenCalled();
+    expect(api.billing).not.toHaveBeenCalled();
+  });
+
+  it('eski /customers manzili Daftarga olib keladi', async () => {
+    const api = fakeApi();
+    api.me.mockResolvedValue(me());
+    mount(api, null, '/customers');
+    expect(await screen.findByTestId('total-debt')).toBeInTheDocument();
   });
 });

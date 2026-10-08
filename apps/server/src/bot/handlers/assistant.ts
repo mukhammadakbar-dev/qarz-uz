@@ -1,4 +1,4 @@
-import { formatSigned, formatUzs, type Locale } from '@nasiya/shared';
+import { formatSigned, formatUzs } from '@nasiya/shared';
 import {
   displayName,
   redecide,
@@ -7,7 +7,7 @@ import {
   type DialogEvent,
   type StepResult,
 } from '@nasiya/nlp';
-import { InlineKeyboard, Keyboard, type Bot } from 'grammy';
+import { InlineKeyboard, type Bot } from 'grammy';
 import type { Pool } from 'pg';
 import type { Config } from '../../config/index.js';
 import {
@@ -20,9 +20,10 @@ import {
   SubscriptionExpiredError,
   ValidationError,
 } from '../../errors/index.js';
-import { t as translate, type MessageKey } from '../../i18n/index.js';
+import type { MessageKey } from '../../i18n/index.js';
 import { createAssistantEnv, type AssistantEnv } from '../../modules/assistant/env.js';
 import { notifyOwnerOfDeletion } from '../../modules/assistant/notify.js';
+import { isBusinessSuspended } from '../../modules/billing/guard.js';
 import { commitDraft } from '../../modules/assistant/commit.js';
 import { createDraft, loadDraft, transitionDraft } from '../../modules/conversation/drafts.js';
 import {
@@ -32,26 +33,22 @@ import {
   type StoredDialog,
 } from '../../modules/conversation/dialog-store.js';
 import { clearState, getState, setState } from '../../modules/conversation/state.js';
-import { createCustomer, getCustomer, searchCustomers } from '../../modules/customers/index.js';
+import { createCustomer, getCustomer } from '../../modules/customers/index.js';
 import {
   interpret,
   setOutcome,
   type AiDeps,
   type InterpretationOutcome,
 } from '../../modules/interpretation/service.js';
-import {
-  deleteEntry,
-  getBusinessSummary,
-  getEntry,
-  getHistory,
-} from '../../modules/ledger/index.js';
+import { deleteEntry, getEntry, getHistory } from '../../modules/ledger/index.js';
 import { resolveBusinessAccess, type BusinessAccess } from '../../modules/tenancy/index.js';
 import type { Logger } from '../../observability/logger.js';
 import type { BotContext } from '../bot.js';
-import { renderDecision, type Button, type Rendered, type RenderContext } from '../ui/render.js';
-import { showHome } from './onboarding.js';
+import { toKeyboard } from '../ui/keyboards.js';
+import { renderDecision, type Rendered, type RenderContext } from '../ui/render.js';
+import { renewKeyboard, showHome } from './onboarding.js';
 
-const STATE_AWAIT_LABEL = 'AWAIT_LABEL';
+export const STATE_AWAIT_LABEL = 'AWAIT_LABEL';
 const TIMEZONE = 'Asia/Tashkent';
 const HISTORY_PAGE = 8;
 
@@ -62,41 +59,10 @@ export interface AssistantDeps {
   readonly ai?: AiDeps | undefined;
 }
 
-const toKeyboard = (buttons: readonly (readonly Button[])[]): InlineKeyboard => {
-  const kb = new InlineKeyboard();
-  for (const row of buttons) {
-    for (const b of row) {
-      if (b.webAppUrl) kb.webApp(b.text, b.webAppUrl);
-      else kb.text(b.text, b.data);
-    }
-    kb.row();
-  }
-  return kb;
-};
-
 const shortDate = (d: Date): string =>
   new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, day: '2-digit', month: '2-digit' })
     .format(d)
     .replace('/', '.');
-
-/** Tez tugmalar (TT §35): ikkala til yorlig'i taqqoslanadi (foydalanuvchi tilni almashtirgan bo'lishi mumkin). */
-const quickKeys = ['quick.addDebt', 'quick.addPayment', 'quick.debtors'] as const;
-const locales: Locale[] = ['uz-Latn', 'uz-Cyrl'];
-function matchQuick(text: string): (typeof quickKeys)[number] | null {
-  for (const key of quickKeys) {
-    if (locales.some((l) => translate(l, key) === text)) return key;
-  }
-  return null;
-}
-
-export const quickKeyboard = (ctx: { t: (k: MessageKey) => string }): Keyboard =>
-  new Keyboard()
-    .text(ctx.t('quick.addDebt'))
-    .text(ctx.t('quick.addPayment'))
-    .row()
-    .text(ctx.t('quick.debtors'))
-    .resized()
-    .persistent();
 
 export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): void {
   const { pool, logger } = deps;
@@ -219,7 +185,18 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
         const rendered = renderDecision(decision, renderCtx(ctx, draftId), {
           reason: env?.lastParsedReason(),
         });
-        if (rendered) await reply(ctx, rendered);
+        if (!rendered) return;
+        if (decision.action === 'BLOCKED_SUBSCRIPTION') {
+          if (await isBusinessSuspended(pool, access)) {
+            await ctx.reply(ctx.t('blocked.suspended'));
+            return;
+          }
+          // Obuna tugagan: uzaytirish so'rovi bir bosishda (admin chatida xabar tayyor)
+          const kb = await renewKeyboard(ctx, deps, access);
+          await ctx.reply(rendered.text, kb ? { reply_markup: kb } : {});
+          return;
+        }
+        await reply(ctx, rendered);
       }
     }
   }
@@ -269,8 +246,18 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
               })
               .trim(),
       );
+    } else if (
+      error instanceof SubscriptionExpiredError &&
+      error.details['reason'] === 'SUSPENDED'
+    ) {
+      await ctx.reply(ctx.t('blocked.suspended'));
     } else if (error instanceof SubscriptionExpiredError) {
-      await ctx.reply([ctx.t('blocked.subscription'), supportLine(ctx)].filter(Boolean).join('\n'));
+      const access = await resolveBusinessAccess(pool, ctx.user).catch(() => null);
+      const kb = access ? await renewKeyboard(ctx, deps, access) : undefined;
+      await ctx.reply(
+        [ctx.t('blocked.subscription'), supportLine(ctx)].filter(Boolean).join('\n'),
+        kb ? { reply_markup: kb } : {},
+      );
     } else if (error instanceof ForbiddenError) {
       await ctx.reply(ctx.t('error.forbidden'));
     } else if (error instanceof NotFoundError) {
@@ -419,12 +406,6 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
     const access = await accessOf(ctx);
     if (!access) return;
 
-    // Tez tugmalar (tabiiy matnni almashtirmaydi)
-    const quick = matchQuick(text);
-    if (quick === 'quick.addDebt') return ctx.reply(ctx.t('quick.debtPrompt'));
-    if (quick === 'quick.addPayment') return ctx.reply(ctx.t('quick.paymentPrompt'));
-    if (quick === 'quick.debtors') return sendDebtors(ctx, access);
-
     // Yorliq kutilmoqda (mijoz yaratish)
     const row = await getState(pool, ctx.user.id);
     if (row?.state === STATE_AWAIT_LABEL) {
@@ -435,37 +416,6 @@ export function registerAssistant(bot: Bot<BotContext>, deps: AssistantDeps): vo
 
     await runStep(ctx, access, { type: 'text', text });
   });
-
-  async function sendDebtors(ctx: BotContext, access: BusinessAccess): Promise<void> {
-    const locale = ctx.user.locale;
-    const [page, summary] = await Promise.all([
-      searchCustomers(pool, access, { onlyDebtors: true, sort: 'debt', limit: 15 }),
-      getBusinessSummary(pool, access),
-    ]);
-    if (page.items.length === 0) {
-      await ctx.reply(ctx.t('debtors.empty'));
-      return;
-    }
-    const lines = [
-      ctx.t('debtors.title', {
-        count: summary.debtorsCount,
-        total: formatUzs(summary.totalDebt, locale),
-      }),
-    ];
-    page.items.forEach((c, i) =>
-      lines.push(
-        ctx.t('debtors.line', {
-          n: i + 1,
-          name: displayName(c),
-          balance: formatUzs(c.balance, locale),
-        }),
-      ),
-    );
-    const kb = new InlineKeyboard();
-    const appUrl = deps.config.telegram.miniAppUrl;
-    if (appUrl) kb.webApp(ctx.t('menu.openApp'), appUrl);
-    await ctx.reply(lines.join('\n'), appUrl ? { reply_markup: kb } : {});
-  }
 
   // Tahrirlangan xabar hisobga olinmaydi (moliyaviy noaniqlik)
   bot.on('edited_message', (ctx) => ctx.reply(ctx.t('unknown.edited')));

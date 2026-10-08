@@ -13,7 +13,11 @@
 | Phase 0 (ADR, golden dataset)                                                                      | ✅ tayyor                                                                                                          |
 | Phase 1 T1.1–T1.10 (scaffold, config, DB, log, CI, sxema/RLS, webhook, identity, RBAC, onboarding) | ✅ tayyor                                                                                                          |
 | Phase 1 T1.11 (staging)                                                                            | 🟡 kod va hujjat tayyor (build, PM2, nginx, DB bootstrap, `deploy.sh`, `docs/DEPLOY.md`); serverda hali sinalmagan |
-| Phase 2 (Ledger) va keyingilar                                                                     | ⏳                                                                                                                 |
+| Phase 2 (Ledger)                                                                                   | ✅ tayyor                                                                                                          |
+| Phase 3 (interpretatsiya, bot UX)                                                                  | ✅ tayyor (Gemini jonli sinalmagan: model `eval:llm` bilan tanlanadi)                                              |
+| Phase 4 (Mini App) + qayta dizayn, bot menyusi, superadmin paneli (ADR-0008)                       | ✅ tayyor                                                                                                          |
+| Phase 5 (billing: `/sub`, `/extend`, `/expiring`, eslatmalar, gating testlari)                     | ✅ tayyor                                                                                                          |
+| Phase 6 (hardening, production)                                                                    | ⏳                                                                                                                 |
 
 ---
 
@@ -128,7 +132,7 @@ Modullar bir-biriga faqat public service interfeysi orqali murojaat qiladi.
 | customer.archive                              | ✔     | —     |
 | staff.manage, business.settings, billing.view | ✔     | —     |
 
-- **Superadmin:** `SUPERADMIN_TELEGRAM_IDS` env orqali beriladi. Faqat billing buyruqlariga ruxsati bor, biznes ma'lumotlarini ko‘ra olmaydi.
+- **Superadmin:** `SUPERADMIN_TELEGRAM_IDS` env orqali beriladi. Mini App'dagi Admin panel (ADR-0008): do‘kon ma'lumotlarini faqat o‘qiydi (audit bilan), obunani uzaytiradi, do‘konni bloklaydi, ommaviy xabar yuboradi.
 
 ### 1.6. AI / NLP pipeline
 

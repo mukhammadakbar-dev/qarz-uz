@@ -24,6 +24,25 @@ export interface Session {
 
 export const SessionContext = createContext<Session | null>(null);
 
+/** Do'konsiz ham mavjud qism: superadmin o'z do'koni bo'lmasa ham panelga kiradi. */
+export interface Core {
+  readonly api: ApiClient;
+  readonly me: Me;
+  readonly locale: Locale;
+  readonly isSuperadmin: boolean;
+}
+
+export const CoreContext = createContext<Core | null>(null);
+
+export function useCore(): Core {
+  const c = useContext(CoreContext);
+  if (!c) throw new Error('SessionProvider kerak');
+  return c;
+}
+
+/** Do'kon tanlangan bo'lsa sessiya, aks holda null (faqat superadmin paneli rejimi). */
+export const useOptionalSession = (): Session | null => useContext(SessionContext);
+
 export function useSession(): Session {
   const s = useContext(SessionContext);
   if (!s) throw new Error('SessionProvider kerak');
@@ -70,11 +89,17 @@ export function SessionProvider({ api, children }: { api: ApiClient; children: R
     const role = me.businesses.find((b) => b.id === businessId)!.role;
     return { api, me, businessId, role, locale, switchBusiness };
   }, [api, me, businessId, locale, switchBusiness]);
+  const core = useMemo<Core | null>(
+    () => (me ? { api, me, locale, isSuperadmin: me.isSuperadmin === true } : null),
+    [api, me, locale],
+  );
 
   return (
     <I18nProvider locale={locale}>
       <Gate meQuery={meQuery} me={me} hasBusiness={businessId !== null} onPick={switchBusiness}>
-        <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+        <CoreContext.Provider value={core}>
+          <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+        </CoreContext.Provider>
       </Gate>
     </I18nProvider>
   );
@@ -110,7 +135,9 @@ function Gate({
       </Centered>
     );
   }
-  if (me.businesses.length === 0) return <Centered>{t('error.noBusiness')}</Centered>;
+  // Do'koni yo'q superadmin faqat panelni ko'radi
+  if (me.businesses.length === 0)
+    return me.isSuperadmin ? <>{children}</> : <Centered>{t('error.noBusiness')}</Centered>;
   if (!hasBusiness) {
     // Bir nechta biznes, hech biri tanlanmagan
     return (

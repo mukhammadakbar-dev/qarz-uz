@@ -13,7 +13,9 @@ import { RateLimitedError, toPublicError } from '../errors/index.js';
 import { runWithContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { reportError } from '../observability/sentry.js';
+import { isSuperadmin, registerAdminApi } from '../api/admin.js';
 import { registerApi } from '../api/routes.js';
+import type { BroadcastSender } from '../modules/admin/broadcast.js';
 import { registerAuthRoutes } from './auth.js';
 
 export const WEBHOOK_PATH = '/telegram/webhook';
@@ -26,6 +28,8 @@ export interface ServerDeps {
   readonly bot: Bot<BotContext>;
   /** Mini App build papkasi (apps/miniapp/dist). Berilsa `/app/` ostida xizmat qilinadi. */
   readonly miniAppDir?: string | undefined;
+  /** Superadmin paneli (`nasiya_system` pool talab qiladi). Berilmasa `/api/admin/*` yo'q. */
+  readonly admin?: { readonly sys: Pool; readonly broadcasts: BroadcastSender } | undefined;
 }
 
 /** Doimiy vaqtli taqqoslash: uzunlik farqi ham ma'lumot bermasligi uchun avval hash qilinadi. */
@@ -175,7 +179,12 @@ export function buildServer(deps: ServerDeps) {
       });
     }
 
-    registerAuthRoutes(routes, { config, pool });
+    const adminEnabled = deps.admin !== undefined;
+    registerAuthRoutes(routes, {
+      config,
+      pool,
+      isSuperadmin: (user) => adminEnabled && isSuperadmin(config, user),
+    });
     registerApi(routes, {
       config,
       pool,
@@ -183,6 +192,16 @@ export function buildServer(deps: ServerDeps) {
       botUsername: () => bot.botInfo.username,
       send: (chatId, text) => bot.api.sendMessage(chatId, text),
     });
+    if (deps.admin) {
+      registerAdminApi(routes, {
+        config,
+        pool,
+        logger,
+        sys: deps.admin.sys,
+        broadcasts: deps.admin.broadcasts,
+        send: (chatId, text) => bot.api.sendMessage(chatId, text),
+      });
+    }
   });
 
   return app;

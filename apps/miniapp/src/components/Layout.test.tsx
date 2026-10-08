@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { fakeApi, renderApp } from '../../test/helpers';
 import { Layout } from './Layout';
 
@@ -11,42 +12,51 @@ const dashboard = (state: 'TRIAL' | 'ACTIVE' | 'EXPIRED', daysLeft = 10) => ({
 });
 
 describe('Layout', () => {
-  it('egasi hamma bo‘limlarni ko‘radi', async () => {
-    const api = fakeApi();
-    api['dashboard'].mockResolvedValue(dashboard('ACTIVE'));
-    renderApp(<Layout />, { api, role: 'OWNER' });
-    const nav = screen.getByRole('navigation');
-    for (const name of ['Bosh sahifa', 'Mijozlar', 'Xodimlar', 'Sozlamalar'])
-      expect(nav).toHaveTextContent(name);
+  it('pastki menyu: Daftar va Biznes (egasi ham, xodim ham)', () => {
+    for (const role of ['OWNER', 'STAFF'] as const) {
+      const api = fakeApi();
+      api['dashboard'].mockResolvedValue(dashboard('ACTIVE'));
+      const view = renderApp(<Layout />, { api, role });
+      const nav = screen.getByRole('navigation');
+      expect(nav).toHaveTextContent('Daftar');
+      expect(nav).toHaveTextContent('Biznes');
+      view.unmount();
+    }
   });
 
-  it('xodim “Xodimlar” va “Sozlamalar” bo‘limlarini ko‘rmaydi', () => {
+  it('ichki sahifada pastki menyu yashirinadi', () => {
     const api = fakeApi();
     api['dashboard'].mockResolvedValue(dashboard('ACTIVE'));
-    renderApp(<Layout />, { api, role: 'STAFF' });
-    const nav = screen.getByRole('navigation');
-    expect(nav).toHaveTextContent('Mijozlar');
-    expect(nav).not.toHaveTextContent('Xodimlar');
-    expect(nav).not.toHaveTextContent('Sozlamalar');
-    expect(screen.getByText('Xodim', { selector: '.role' })).toBeInTheDocument();
+    renderApp(<Layout />, { api, route: '/customers/c1' });
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });
 
-  it('obuna tugagan: banner va to‘lov raqami', async () => {
+  it('obuna tugagan: “Obunani uzaytirish” admin chatini biznes kodi bilan tayyor xabarda ochadi', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
     const api = fakeApi();
     api['dashboard'].mockResolvedValue(dashboard('EXPIRED', 0));
-    api['billing'].mockResolvedValue({ supportPhone: '+998907900110' });
+    api['billing'].mockResolvedValue({ supportPhone: '+998907900110', shortCode: 'TD-AB2CD' });
     renderApp(<Layout />, { api });
     const banner = await screen.findByRole('alert');
     expect(banner).toHaveTextContent('Obuna muddati tugagan');
-    await waitFor(() => expect(banner).toHaveTextContent('+998907900110'));
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: 'Obunani uzaytirish' }));
+    const url = new URL(open.mock.calls[0]![0] as string);
+    expect(url.origin + url.pathname).toBe('https://t.me/+998907900110');
+    expect(url.searchParams.get('text')).toBe(
+      'Assalomu alaykum! Obuna muddatini uzaytirmoqchiman. ID: `TD-AB2CD`',
+    );
+    open.mockRestore();
   });
 
-  it('xodimga billing ochiq emas: banner raqamsiz ham ishlaydi', async () => {
+  it('xodim: banner bor, billing so‘ralmaydi (xodimga ochiq emas)', async () => {
     const api = fakeApi();
     api['dashboard'].mockResolvedValue(dashboard('EXPIRED', 0));
-    api['billing'].mockRejectedValue(new Error('403'));
     renderApp(<Layout />, { api, role: 'STAFF' });
     expect(await screen.findByRole('alert')).toHaveTextContent('Obuna muddati tugagan');
+    expect(api['billing']).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Obunani uzaytirish' })).not.toBeInTheDocument();
   });
 
   it('sinov muddati tugashiga 3 kun qolganda eslatma; undan ko‘pida yo‘q', async () => {

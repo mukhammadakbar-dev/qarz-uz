@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/onest": "^5.3.1",
     "@nasiya/shared": "workspace:*",
     "@tanstack/react-query": "^5.104.1",
     "@telegram-apps/sdk": "^3.11.8",

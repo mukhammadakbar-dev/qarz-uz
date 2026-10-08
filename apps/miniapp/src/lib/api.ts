@@ -1,13 +1,20 @@
 import type {
+  AdminBusiness,
+  AdminBusinessDetail,
+  AdminFilter,
+  AdminStats,
   Billing,
+  Broadcast,
   BusinessSettings,
   Customer,
   CustomerPage,
   Dashboard,
   HistoryPage,
+  Locale,
   Me,
   PostResult,
   Preview,
+  SegmentState,
   SortKey,
   StaffMember,
 } from './types';
@@ -129,6 +136,8 @@ export class ApiClient {
 
   // ───────── Endpointlar ─────────
   me = () => this.request<Me>('GET', '/api/me');
+  setLocale = (locale: Locale) =>
+    this.request<{ user: Me['user'] }>('PATCH', '/api/me', { body: { locale } });
   switchBusiness = (businessId: string) =>
     this.request<{ activeBusinessId: string }>('POST', '/api/businesses/active', {
       body: { businessId },
@@ -190,4 +199,50 @@ export class ApiClient {
   updateBusiness = (body: { name?: string; notifyOwnerOnDelete?: boolean }) =>
     this.request<BusinessSettings>('PATCH', '/api/business', { body });
   billing = () => this.request<Billing>('GET', '/api/billing');
+
+  // ───────── Superadmin ─────────
+  adminStats = () => this.request<AdminStats>('GET', '/api/admin/stats');
+  adminBusinesses = (q: { q?: string; filter?: AdminFilter; cursor?: string; limit?: number }) =>
+    this.request<{ items: AdminBusiness[]; nextCursor: string | null }>(
+      'GET',
+      '/api/admin/businesses',
+      { query: { ...q } },
+    );
+  adminBusiness = (id: string) =>
+    this.request<AdminBusinessDetail>('GET', `/api/admin/businesses/${id}`);
+  adminCustomers = (id: string, q: { q?: string; cursor?: string; limit?: number }) =>
+    this.request<CustomerPage>('GET', `/api/admin/businesses/${id}/customers`, {
+      query: { ...q },
+    });
+  adminCustomer = (id: string, customerId: string) =>
+    this.request<Customer>('GET', `/api/admin/businesses/${id}/customers/${customerId}`);
+  adminLedger = (id: string, customerId: string, q: { cursor?: string; limit?: number } = {}) =>
+    this.request<HistoryPage>('GET', `/api/admin/businesses/${id}/customers/${customerId}/ledger`, {
+      query: { ...q },
+    });
+  adminExtend = (
+    id: string,
+    body: { months: number; amount?: number; note?: string },
+    key: string,
+  ) =>
+    this.request<{ paidUntil: string; periodFrom: string }>(
+      'POST',
+      `/api/admin/businesses/${id}/extend`,
+      { body, key },
+    );
+  adminSuspend = (id: string, reason?: string) =>
+    this.request<{ suspendedAt: string | null }>('POST', `/api/admin/businesses/${id}/suspend`, {
+      body: reason ? { reason } : {},
+    });
+  adminUnsuspend = (id: string) =>
+    this.request<{ suspendedAt: string | null }>('POST', `/api/admin/businesses/${id}/unsuspend`, {
+      body: {},
+    });
+  adminBroadcastPreview = (body: { segments: SegmentState[]; includeStaff: boolean }) =>
+    this.request<{ recipients: number }>('POST', '/api/admin/broadcasts/preview', { body });
+  adminBroadcast = (
+    body: { text: string; segments: SegmentState[]; includeStaff: boolean },
+    key: string,
+  ) => this.request<{ id: string; total: number }>('POST', '/api/admin/broadcasts', { body, key });
+  adminBroadcasts = () => this.request<{ items: Broadcast[] }>('GET', '/api/admin/broadcasts');
 }
