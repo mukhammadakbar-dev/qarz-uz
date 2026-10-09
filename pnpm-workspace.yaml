@@ -5,3 +5,5 @@ allowBuilds:
   esbuild: true
   '@google/genai': false
   protobufjs: false
+overrides:
+  valibot: '>=1.4.2'
