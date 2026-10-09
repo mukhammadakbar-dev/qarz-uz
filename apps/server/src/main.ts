@@ -1,14 +1,16 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as Sentry from '@sentry/node';
-import { ALLOWED_UPDATES, createBot, registerFallback } from './bot/bot.js';
+import { ALLOWED_UPDATES, createBot, createBotRateLimiter, registerFallback } from './bot/bot.js';
 import { ADMIN_COMMANDS } from './bot/handlers/admin.js';
 import { BOT_COMMANDS } from './bot/handlers/menu.js';
 import { loadConfig, redactConfig } from './config/index.js';
 import { createPool } from './db/pool.js';
 import { buildServer } from './http/server.js';
 import { createLogger } from './observability/logger.js';
-import { initSentry } from './observability/sentry.js';
+import { initSentry, onUnexpectedError } from './observability/sentry.js';
+import { Alerter } from './modules/alerts/alerter.js';
 import { BroadcastSender } from './modules/admin/broadcast.js';
 import { scheduleReminders } from './modules/billing/reminders.js';
 import { createGeminiGenerate, createGeminiProvider } from './modules/interpretation/gemini.js';
@@ -37,6 +39,7 @@ const bot = createBot({
   logger,
   pool,
   sys: systemPool,
+  rateLimiter: createBotRateLimiter(config.telegram.rateLimitPerMinute),
   ai: gemini
     ? {
         provider: createGeminiProvider({
@@ -54,6 +57,15 @@ logger.info(
   'interpretatsiya rejimi',
 );
 await bot.init();
+
+// Operator ogohlantirishlari (T6.3): superadmin chatiga, kalit bo'yicha 30 daqiqada bir marta
+const alerter = new Alerter({
+  send: (chatId, text) => bot.api.sendMessage(chatId, text),
+  chatIds: config.billing.superadminTelegramIds,
+  logger,
+});
+onUnexpectedError((error) => alerter.recordError(error));
+const alert = (key: string, text: string) => void alerter.notify(key, text);
 registerFallback(bot);
 // "/" menyusi: Mini App bo'lmasa /app ko'rsatilmaydi
 await bot.api
@@ -99,6 +111,7 @@ const broadcasts = systemPool
   ? new BroadcastSender({
       sys: systemPool,
       logger,
+      alert,
       send: (chatId, text) => bot.api.sendMessage(chatId, text),
     })
   : undefined;
@@ -113,12 +126,33 @@ const app = buildServer({
 
 await app.listen({ host: config.http.host, port: config.http.port });
 
-const stopMaintenance = systemPool ? scheduleMaintenance(systemPool, logger) : undefined;
+// Deploy yoki qayta ishga tushishni ko'rish uchun (crash-loop bo'lsa ham shu yerdan bilinadi)
+if (config.isProduction) {
+  let commit = 'noma’lum';
+  try {
+    commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    /* git yo'q — muhim emas */
+  }
+  alert('startup', `✅ Kissa ishga tushdi (${commit}).`);
+}
+
+const stopMaintenance = systemPool
+  ? scheduleMaintenance(systemPool, logger, undefined, (result) => {
+      if (result.balanceMismatches > 0)
+        alert(
+          'reconcile',
+          `🚨 Kissa: ${result.balanceMismatches} ta mijoz qoldig'i ledger bilan mos emas. ` +
+            'Runbook: docs/RUNBOOK.md → «Qoldiq nomuvofiqligi».',
+        );
+    })
+  : undefined;
 // Obuna eslatmalari: 3 kun, 1 kun qolganda va tugagan kuni (09:00–21:00)
 const stopReminders = systemPool
   ? scheduleReminders({
       sys: systemPool,
       logger,
+      alert,
       supportPhone: config.billing.supportPhone,
       send: (chatId, text, button) =>
         bot.api.sendMessage(

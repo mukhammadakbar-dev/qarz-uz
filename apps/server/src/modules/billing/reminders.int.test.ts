@@ -72,7 +72,9 @@ async function shop(
 
 function fakeSend(fail: (chatId: number) => unknown = () => null) {
   const sent: { chatId: number; text: string; url: string | undefined }[] = [];
+  const alerts: string[] = [];
   const deps: ReminderDeps = {
+    alert: (key) => alerts.push(key),
     sys,
     logger,
     supportPhone: '+998907900110',
@@ -82,7 +84,7 @@ function fakeSend(fail: (chatId: number) => unknown = () => null) {
       sent.push({ chatId, text, url: button?.url });
     },
   };
-  return { deps, sent, to: (s: Shop) => sent.filter((m) => m.chatId === s.ownerTg) };
+  return { deps, sent, alerts, to: (s: Shop) => sent.filter((m) => m.chatId === s.ownerTg) };
 }
 
 const at = (ms: number) => new Date(NOW.getTime() + ms);
@@ -158,13 +160,14 @@ describe('obuna eslatmalari', () => {
     const blockedOwner = await shop(at(2 * DAY));
     const flaky = await shop(at(2 * DAY));
     let flakyFails = true;
-    const { deps, to } = fakeSend((chatId) => {
+    const { deps, to, alerts } = fakeSend((chatId) => {
       if (chatId === blockedOwner.ownerTg) return { error_code: 403, description: 'Forbidden' };
       if (chatId === flaky.ownerTg && flakyFails) return { error_code: 500, description: 'oops' };
       return null;
     });
     await runReminders(deps, NOW);
     expect(to(flaky)).toEqual([]);
+    expect(alerts).toEqual(['reminders']); // vaqtinchalik xato — operatorga; bloklagan ega — yo'q
     const statusOf = async (s: Shop) =>
       (await sys.query('SELECT status FROM notifications WHERE business_id = $1', [s.businessId]))
         .rows;

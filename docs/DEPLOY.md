@@ -24,7 +24,7 @@ ssh root@75.119.158.99 'sudo -iu kissa bash -c "APP_DIR=/srv/kissa /srv/kissa/de
 
 Tiklash (favqulodda): `pm2 stop nasiya` → `sudo -u postgres dropdb nasiya && sudo -u postgres createdb -O nasiya_migrator nasiya` → `sudo -u postgres pg_restore -d nasiya < /var/backups/kissa/<fayl>.dump` → `pm2 start nasiya`.
 
-**Hali yo‘q:** zaxira nusxalar shu serverning o‘zida turadi — server yo‘qolsa nusxa ham yo‘qoladi. Real foydalanuvchilar ko‘paygach nusxani boshqa joyga (masalan, shifrlangan holda S3-mos saqlash) ko‘chirish kerak (T6.5).
+**Offsite:** `BACKUP_PASSPHRASE` + `BACKUP_TELEGRAM_CHAT_ID` berilsa nusxa shifrlanib Telegram'ga ketadi (`docs/RUNBOOK.md` §6). **Berilmaguncha:** zaxira nusxalar shu serverning o‘zida turadi — server yo‘qolsa nusxa ham yo‘qoladi. Real foydalanuvchilar ko‘paygach nusxani boshqa joyga (masalan, shifrlangan holda S3-mos saqlash) ko‘chirish kerak (T6.5).
 
 ---
 
@@ -126,5 +126,5 @@ Migratsiyalar faqat oldinga ketadi, rollback sxemani qaytarmaydi. Shu sababli ha
 ## 7. Hali yo‘q (rejada)
 
 - Kunlik zaxira nusxa va tiklash mashqi (T6.5): **zaxirasiz production’ga real foydalanuvchi qo‘shmang.**
-- Monitoring/alert (T6.3), log rotatsiyasi (`pm2 install pm2-logrotate`).
+- Monitoring/alert serverga o‘rnatilishi (`kissa-notify`, `kissa-watchdog`, UptimeRobot): `docs/RUNBOOK.md` §0.
 - GitHub Actions orqali avtomatik deploy (server tayyor bo‘lgach).

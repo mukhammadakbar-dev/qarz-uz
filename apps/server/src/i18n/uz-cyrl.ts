@@ -42,6 +42,7 @@ export const uzCyrl: Record<MessageKey, string> = {
   'role.STAFF': 'Ходим',
 
   'error.generic': 'Кечирасиз, хатолик юз берди. Илтимос, қайта уриниб кўринг.',
+  'error.rateLimited': 'Жуда тез ёзяпсиз. Бир дақиқадан сўнг давом этинг.',
   'error.noBusiness': 'Аввал бизнес яратинг: /start',
   'error.forbidden': 'Бу амал учун рухсатингиз йўқ.',
   'fallback.unknown':

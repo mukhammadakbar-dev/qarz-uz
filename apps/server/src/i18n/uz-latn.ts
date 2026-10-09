@@ -41,6 +41,7 @@ export const uzLatn = {
   'role.STAFF': 'Xodim',
 
   'error.generic': 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko‘ring.',
+  'error.rateLimited': 'Juda tez yozyapsiz. Bir daqiqadan so‘ng davom eting.',
   'error.noBusiness': 'Avval biznes yarating: /start',
   'error.forbidden': 'Bu amal uchun ruxsatingiz yo‘q.',
   'fallback.unknown':

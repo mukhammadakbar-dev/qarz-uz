@@ -65,6 +65,8 @@ const envSchema = z
       )
       .pipe(z.array(z.url())),
     API_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).max(1_000_000).default(240),
+    // Bot: bitta foydalanuvchidan daqiqasiga update (birdaniga shuncha tagacha); 0 — o'chiq
+    BOT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).max(10_000).default(30),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(60).default(3600),
     INITDATA_MAX_AGE_SECONDS: z.coerce.number().int().min(60).default(86400),
 
@@ -143,6 +145,7 @@ export interface Config {
     readonly mode: 'webhook' | 'polling';
     readonly publicBaseUrl: string | undefined;
     readonly miniAppUrl: string | undefined;
+    readonly rateLimitPerMinute: number;
   };
   readonly api: { readonly corsOrigins: readonly string[]; readonly rateLimitPerMinute: number };
   readonly session: {
@@ -216,6 +219,7 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
       mode: e.TELEGRAM_MODE ?? (production ? 'webhook' : 'polling'),
       publicBaseUrl: e.PUBLIC_BASE_URL?.replace(/\/+$/, ''),
       miniAppUrl: e.MINIAPP_URL,
+      rateLimitPerMinute: e.BOT_RATE_LIMIT_PER_MINUTE,
     }),
     api: Object.freeze({
       corsOrigins: Object.freeze([

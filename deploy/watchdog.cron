@@ -1,0 +1,2 @@
+# Kissa watchdog: har 5 daqiqada ilova va Telegram webhook holati (deploy/watchdog.sh)
+*/5 * * * * root /usr/local/bin/kissa-watchdog >> /var/log/kissa-watchdog.log 2>&1

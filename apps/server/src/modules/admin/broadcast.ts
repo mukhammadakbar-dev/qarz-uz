@@ -181,6 +181,8 @@ export interface SenderDeps {
   /** Xabarlar orasidagi pauza (Telegram: ~30 xabar/soniya; zaxira bilan ~20). */
   readonly intervalMs?: number;
   readonly sleep?: (ms: number) => Promise<void>;
+  /** Xato bilan tugagan xabarlar bo'lsa operatorga (T6.3). */
+  readonly alert?: (key: string, text: string) => void;
 }
 
 /**
@@ -208,6 +210,7 @@ export class BroadcastSender {
     const { sys, logger } = this.deps;
     const sleep = this.deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
     const interval = this.deps.intervalMs ?? 50;
+    let failed = 0;
     while (!this.stopped) {
       const next = await sys.query<{
         broadcast_id: string;
@@ -242,14 +245,21 @@ export class BroadcastSender {
               c.kind === 'blocked' ? 'BLOCKED' : 'FAILED',
               c.text,
             );
-            if (c.kind === 'failed')
+            if (c.kind !== 'blocked') {
+              failed++;
               logger.warn({ broadcastId: r.broadcast_id }, 'broadcast xabari yuborilmadi');
+            }
             break;
           }
         }
         await sleep(interval);
       }
     }
+    if (failed > 0)
+      this.deps.alert?.(
+        'broadcast',
+        `⚠️ Kissa: ommaviy xabarda ${failed} ta xabar xato bilan yuborilmadi (Admin → Ommaviy xabar).`,
+      );
     // Hamma qabul qiluvchisi ishlangan broadcast'lar yakunlanadi
     await sys.query(
       `UPDATE broadcasts b SET status = 'DONE', finished_at = now()

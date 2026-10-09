@@ -36,9 +36,24 @@ export function initSentry(config: Pick<Config, 'sentryDsn' | 'env'>): boolean {
   return true;
 }
 
+let unexpectedErrorListener: ((error: unknown) => void) | undefined;
+
+/** Kutilmagan xatolarni kuzatish (operator ogohlantirishlari, T6.3). Qaytgan funksiya obunani bekor qiladi. */
+export function onUnexpectedError(listener: (error: unknown) => void): () => void {
+  unexpectedErrorListener = listener;
+  return () => {
+    if (unexpectedErrorListener === listener) unexpectedErrorListener = undefined;
+  };
+}
+
 /** Faqat kutilmagan xatolar yuboriladi; kutilgan domen xatolari (validatsiya, ruxsat) yuborilmaydi. */
 export function reportError(error: unknown): void {
   if (isDomainError(error) && error.expose) return;
+  try {
+    unexpectedErrorListener?.(error);
+  } catch {
+    /* kuzatuvchi xatosi asosiy oqimni buzmasin */
+  }
   const ctx = getContext();
   Sentry.captureException(error, {
     tags: {

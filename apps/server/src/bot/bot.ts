@@ -8,11 +8,13 @@ import { reportError } from '../observability/sentry.js';
 import { runWithContext, setContext } from '../observability/context.js';
 import type { Logger } from '../observability/logger.js';
 import { KeyedMutex } from '../util/keyed-mutex.js';
+import { RateLimiter } from '../util/rate-limiter.js';
 import type { AiDeps } from '../modules/interpretation/service.js';
 import { registerAdmin } from './handlers/admin.js';
 import { registerAssistant } from './handlers/assistant.js';
 import { registerMenu } from './handlers/menu.js';
 import { registerOnboarding } from './handlers/onboarding.js';
+import { retryOn429 } from './throttle.js';
 
 /** Faqat kerakli update turlari (ADR-0006 §1). */
 export const ALLOWED_UPDATES = [
@@ -41,6 +43,13 @@ export interface BotDeps {
   readonly ai?: AiDeps | undefined;
   /** `nasiya_system` pool: superadmin buyruqlari (/sub, /extend, /expiring). Berilmasa ular o'chiq. */
   readonly sys?: Pool | undefined;
+  /** Foydalanuvchi bo'yicha update chegarasi (T6.2). Berilmasa cheklanmaydi. */
+  readonly rateLimiter?: RateLimiter | undefined;
+}
+
+/** `BOT_RATE_LIMIT_PER_MINUTE` dan limiter (0 — o'chiq). */
+export function createBotRateLimiter(perMinute: number): RateLimiter | undefined {
+  return perMinute > 0 ? new RateLimiter({ perMinute, burst: perMinute }) : undefined;
 }
 
 /**
@@ -48,6 +57,7 @@ export interface BotDeps {
  *  1. log konteksti (updateId)
  *  2. xato chegarasi: foydalanuvchiga umumiy xabar, tafsilot loglarda (matnsiz)
  *  3. faqat private chat
+ *  3a. foydalanuvchi bo'yicha chegara (bazaga tegmasdan oldin): birinchi oshishda bir marta aytiladi, keyin jim
  *  4. bir chat ichida ketma-ket ishlov (kelish tartibida)
  *  5. update dedupe (processed_updates, best-effort — moliyaviy kafolat emas, ADR-0003)
  *  6. identity: Telegram `from` bo'yicha foydalanuvchi (ctx.user); botlar e'tiborsiz
@@ -58,6 +68,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     deps.config.telegram.botToken,
     deps.botInfo ? { botInfo: deps.botInfo } : undefined,
   );
+  bot.api.config.use(retryOn429());
   const mutex = new KeyedMutex();
 
   bot.use((ctx, next) => runWithContext({ updateId: ctx.update.update_id }, () => next()));
@@ -85,6 +96,25 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
     await next();
   });
+
+  const limiter = deps.rateLimiter;
+  if (limiter)
+    bot.use(async (ctx, next) => {
+      const from = ctx.from;
+      if (!from) return next();
+      const decision = limiter.take(String(from.id));
+      if (decision === 'allow') return next();
+      logger.warn({ telegramId: from.id, decision }, 'foydalanuvchi chegarasidan oshdi');
+      if (decision === 'limited') {
+        // Tugma "aylanib" qolmasin
+        if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => undefined);
+        return;
+      }
+      // Identity (va tanlangan til) hali yuklanmagan — bazaga atay tegmaymiz
+      const text = translate('uz-Latn', 'error.rateLimited');
+      if (ctx.callbackQuery) await ctx.answerCallbackQuery({ text });
+      else await ctx.reply(text);
+    });
 
   // Navbatga kirish sinxron: update'lar chatga kelish tartibida ishlanadi (dedupe'dan oldin).
   bot.use((ctx, next) => {

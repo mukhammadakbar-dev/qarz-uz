@@ -81,11 +81,13 @@ export function scheduleMaintenance(
   system: Pool,
   logger: Logger,
   everyMs = 60 * 60 * 1000,
+  /** Natija kuzatuvchisi (masalan, qoldiq nomuvofiqligida operatorni ogohlantirish). */
+  onResult?: (result: MaintenanceResult) => void,
 ): () => void {
   const tick = () => {
-    runMaintenance(system, logger).catch((error: unknown) =>
-      logger.error({ err: error }, 'xizmat vazifalari xatosi'),
-    );
+    runMaintenance(system, logger)
+      .then((result) => onResult?.(result))
+      .catch((error: unknown) => logger.error({ err: error }, 'xizmat vazifalari xatosi'));
   };
   const timer = setInterval(tick, everyMs);
   timer.unref();

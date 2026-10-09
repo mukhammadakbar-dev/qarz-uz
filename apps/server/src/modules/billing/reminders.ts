@@ -125,6 +125,8 @@ export interface ReminderDeps {
     text: string,
     button?: { readonly text: string; readonly url: string },
   ) => Promise<unknown>;
+  /** Vaqtinchalik bo'lmagan yuborish xatolari bo'lsa operatorga (T6.3). */
+  readonly alert?: (key: string, text: string) => void;
 }
 
 export interface ReminderRun {
@@ -171,6 +173,11 @@ export async function runReminders(deps: ReminderDeps, now = new Date()): Promis
     }
   }
   if (sent + blocked + failed > 0) deps.logger.info({ sent, blocked, failed }, 'obuna eslatmalari');
+  if (failed > 0)
+    deps.alert?.(
+      'reminders',
+      `⚠️ Kissa: ${failed} ta obuna eslatmasi yuborilmadi (keyingi yurishda qayta urinadi).`,
+    );
   return { skipped: false, sent, blocked, failed };
 }
 
