@@ -30,7 +30,7 @@ else
   if [ "$fails" -ge 2 ] && [ ! -f "$down_file" ]; then
     TZ=Asia/Tashkent date '+%d.%m %H:%M' > "$down_file"
     pm2_state=$(sudo -iu kissa pm2 jlist 2>/dev/null | grep -o '"status":"[a-z]*"' | head -n1 | cut -d'"' -f4)
-    "$NOTIFY" "🚨 Kissa javob bermayapti (/readyz ${fails} marta). PM2: ${pm2_state:-noma'lum}.
+    "$NOTIFY" "🚨 Kissa javob bermayapti (/readyz ${fails} marta). PM2: ${pm2_state:-noma’lum}.
 Tekshiring: ssh root@server 'sudo -iu kissa pm2 logs nasiya --lines 50'"
   fi
 fi
