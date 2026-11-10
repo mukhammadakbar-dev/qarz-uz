@@ -1,0 +1,51 @@
+name: Deploy
+
+# CI `main` da muvaffaqiyatli o'tgandan keyingina ishga tushadi. Serverda `deploy.sh` o'zi build, migratsiya,
+# PM2 reload va /readyz tekshiruvini qiladi; o'tmasa avvalgi versiyaga qaytadi va bu job qizil bo'ladi.
+# Sozlash: docs/DEPLOY.md → «Avtomatik deploy (CD)».
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Ketma-ket deploy'lar navbatda turadi, bir-birini bekor qilmaydi (yarim deploy bo'lmasin)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: SSH kalitini sozlash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Host kaliti oldindan qotirilgan (ssh-keyscan emas): MITM bo'lsa ulanish rad etiladi
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # Serverdagi kalit forced command bilan deploy.sh ga bog'langan: yuborilgan "buyruq" bajarilmaydi,
+      # deploy.sh uni SSH_ORIGINAL_COMMAND dan commit SHA sifatida o'qiydi (CI'dan o'tgan aynan shu commit chiqadi)
+      - name: Serverda deploy.sh ishga tushirish
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: ssh -o StrictHostKeyChecking=yes -o BatchMode=yes "$SSH_USER@$SSH_HOST" "$DEPLOY_SHA"
+
+      - name: SSH kalitini tozalash
+        if: always()
+        run: rm -rf ~/.ssh/id_ed25519

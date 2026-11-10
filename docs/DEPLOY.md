@@ -123,8 +123,41 @@ Mini App Node jarayonining o‘zi tomonidan `/app/` ostida beriladi (`apps/minia
 
 Migratsiyalar faqat oldinga ketadi, rollback sxemani qaytarmaydi. Shu sababli har bir migratsiya avvalgi kod versiyasi bilan mos ishlashi kerak (avval ustun qo‘shish, keyin ishlatish, eng oxirida eskisini olib tashlash).
 
+## 6a. Avtomatik deploy (CD)
+
+`.github/workflows/deploy.yml`: `main` ga push → CI yashil → GitHub Actions serverga SSH qiladi → `deploy/deploy.sh`. Workflow CI'dan o‘tgan commit SHA'sini yuboradi (forced command uni `SSH_ORIGINAL_COMMAND` orqali oladi), shuning uchun keyinroq push qilingan, hali tekshirilmagan commit chiqib ketmaydi. Deploy muvaffaqiyatsiz bo‘lsa skript avvalgi versiyaga qaytadi va workflow qizil bo‘ladi. Qo‘lda ishga tushirish: Actions → Deploy → Run workflow.
+
+SSH kaliti serverda **faqat deploy.sh** ni ishga tushira oladi (`command=`; `bash -lc` — `pm2` va `pnpm` PATH’da bo‘lishi uchun), shuning uchun kalit sizib chiqsa ham serverda boshqa buyruq bajarib bo‘lmaydi.
+
+Bir marta sozlash:
+
+```bash
+# 1. Lokal kompyuterda: deploy uchun alohida kalit (parolsiz)
+ssh-keygen -t ed25519 -N "" -C "github-actions-deploy" -f ./kissa_deploy
+
+# 2. Serverda, root sifatida: ochiq kalitni kissa'ga cheklab qo'shish
+install -d -m 700 -o kissa -g kissa ~kissa/.ssh
+echo 'restrict,command="bash -lc '"'"'APP_DIR=/srv/kissa /srv/kissa/deploy/deploy.sh'"'"'" '"$(cat kissa_deploy.pub)" >> ~kissa/.ssh/authorized_keys
+chown kissa:kissa ~kissa/.ssh/authorized_keys && chmod 600 ~kissa/.ssh/authorized_keys
+
+```
+
+GitHub → repo → Settings → Environments → **New environment** `production` (xohlasangiz «Required reviewers» qo‘shing: har deploy tasdiq so‘raydi). Shu environment ichida:
+
+| Turi   | Nomi              | Qiymat                                                                                                                                                                                           |
+| ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Secret | `SSH_PRIVATE_KEY` | `kissa_deploy` (maxfiy kalit) fayli to‘liq matni                                                                                                                                                 |
+| Secret | `SSH_HOST`        | `75.119.158.99`                                                                                                                                                                                  |
+| Secret | `SSH_USER`        | `kissa`                                                                                                                                                                                          |
+| Secret | `SSH_KNOWN_HOSTS` | `75.119.158.99 ssh-ed25519 AAAAC3Nza…UNo/` (serverning host kaliti; `ssh-keyscan -t ed25519 75.119.158.99`, fingerprint `SHA256:hvI8anFBYQWE67v89jJPdGBbBjtJJonAGMUe26pIDSs` bilan solishtiring) |
+
+(Nomlar takallamai bilan bir xil.)
+
+So‘ng lokal `kissa_deploy` va `kissa_deploy.pub` fayllarini o‘chiring (`shred -u kissa_deploy`).
+
+Deploy ko‘lamiga **kirmaydi**: `/usr/local/bin` dagi `kissa-notify`, `kissa-watchdog`, `kissa-backup.sh` va cron fayllar. `deploy/*.sh` o‘zgarsa, `docs/RUNBOOK.md` §0 dagi `install` buyruqlarini root sifatida qayta bajaring.
+
 ## 7. Hali yo‘q (rejada)
 
 - Kunlik zaxira nusxa va tiklash mashqi (T6.5): **zaxirasiz production’ga real foydalanuvchi qo‘shmang.**
 - Monitoring/alert serverga o‘rnatilishi (`kissa-notify`, `kissa-watchdog`, UptimeRobot): `docs/RUNBOOK.md` §0.
-- GitHub Actions orqali avtomatik deploy (server tayyor bo‘lgach).

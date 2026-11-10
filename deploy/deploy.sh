@@ -40,10 +40,22 @@ healthy() {
   return 1
 }
 
-log "yangilanmoqda: $PREVIOUS -> origin/$BRANCH"
+# CD (GitHub Actions) CI'dan o'tgan aniq commit SHA'sini SSH buyrug'i sifatida yuboradi; forced command
+# tufayli u bajarilmaydi, faqat SSH_ORIGINAL_COMMAND da keladi. Bo'sh bo'lsa origin/$BRANCH deploy qilinadi.
+DEPLOY_SHA="${DEPLOY_SHA:-${SSH_ORIGINAL_COMMAND:-}}"
+TARGET="origin/$BRANCH"
+
 git fetch --prune origin
+if [ -n "$DEPLOY_SHA" ]; then
+  [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || { log "noto'g'ri DEPLOY_SHA: $DEPLOY_SHA"; exit 1; }
+  git merge-base --is-ancestor "$DEPLOY_SHA" "origin/$BRANCH" ||
+    { log "DEPLOY_SHA origin/$BRANCH tarixida yo'q: $DEPLOY_SHA"; exit 1; }
+  TARGET="$DEPLOY_SHA"
+fi
+
+log "yangilanmoqda: $PREVIOUS -> $TARGET"
 git checkout -q "$BRANCH"
-git reset --hard "origin/$BRANCH"
+git reset --hard "$TARGET"
 CURRENT="$(git rev-parse HEAD)"
 
 pnpm install --frozen-lockfile
